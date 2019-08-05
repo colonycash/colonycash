@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y python3-pip
 RUN pip3 install pyzmq # really needed?
 
 # colonycash_hash
-RUN git clone https://github.com/colonycashpay/colonycash_hash
+RUN git clone https://github.com/colonycash/colonycash_hash
 RUN cd colonycash_hash && python3 setup.py install
 
 ARG USER_ID=1000
