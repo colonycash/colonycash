@@ -1,35 +1,29 @@
 dnl require autoconf 2.60 (AS_ECHO/AS_ECHO_N)
 AC_PREREQ([2.60])
-define(_CLIENT_VERSION_MAJOR, 0)
-define(_CLIENT_VERSION_MINOR, 14)
-define(_CLIENT_VERSION_REVISION, 1)
+define(_CLIENT_VERSION_MAJOR, 1)
+define(_CLIENT_VERSION_MINOR, 0)
+define(_CLIENT_VERSION_REVISION, 0)
 define(_CLIENT_VERSION_BUILD, 0)
-define(_CLIENT_VERSION_IS_RELEASE, false)
+define(_CLIENT_VERSION_IS_RELEASE, true)
 define(_COPYRIGHT_YEAR, 2019)
 define(_COPYRIGHT_HOLDERS,[The %s developers])
-define(_COPYRIGHT_HOLDERS_SUBSTITUTION,[[Dash Core]])
-AC_INIT([Dash Core],[_CLIENT_VERSION_MAJOR._CLIENT_VERSION_MINOR._CLIENT_VERSION_REVISION],[https://github.com/dashpay/dash/issues],[dashcore],[https://dash.org/])
+define(_COPYRIGHT_HOLDERS_SUBSTITUTION,[[ColonyCash Core]])
+AC_INIT([ColonyCash Core],[_CLIENT_VERSION_MAJOR._CLIENT_VERSION_MINOR._CLIENT_VERSION_REVISION],[https://github.com/colonycashpay/colonycash/issues],[colonycashcore],[https://colonycash.org/])
 AC_CONFIG_SRCDIR([src/validation.cpp])
-AC_CONFIG_HEADERS([src/config/dash-config.h])
+AC_CONFIG_HEADERS([src/config/colonycash-config.h])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([build-aux/m4])
 
-BITCOIN_DAEMON_NAME=dashd
-BITCOIN_GUI_NAME=dash-qt
-BITCOIN_CLI_NAME=dash-cli
-BITCOIN_TX_NAME=dash-tx
-
-dnl Unless the user specified ARFLAGS, force it to be cr
-AC_ARG_VAR(ARFLAGS, [Flags for the archiver, defaults to <cr> if not set])
-if test "x${ARFLAGS+set}" != "xset"; then
-  ARFLAGS="cr"
-fi
+BITCOIN_DAEMON_NAME=colonycashd
+BITCOIN_GUI_NAME=colonycash-qt
+BITCOIN_CLI_NAME=colonycash-cli
+BITCOIN_TX_NAME=colonycash-tx
 
 AC_CANONICAL_HOST
 
-AH_TOP([#ifndef DASH_CONFIG_H])
-AH_TOP([#define DASH_CONFIG_H])
-AH_BOTTOM([#endif //DASH_CONFIG_H])
+AH_TOP([#ifndef CCASH_CONFIG_H])
+AH_TOP([#define CCASH_CONFIG_H])
+AH_BOTTOM([#endif //CCASH_CONFIG_H])
 
 dnl faketime breaks configure and is only needed for make. Disable it here.
 unset FAKETIME
@@ -93,7 +87,6 @@ AC_PATH_PROG(HEXDUMP,hexdump)
 AC_PATH_TOOL(READELF, readelf)
 AC_PATH_TOOL(CPPFILT, c++filt)
 AC_PATH_TOOL(OBJCOPY, objcopy)
-AC_PATH_TOOL(DSYMUTIL, dsymutil)
 
 AC_ARG_VAR(PYTHONPATH, Augments the default search path for python module files)
 
@@ -131,10 +124,10 @@ AC_ARG_ENABLE(bench,
     [use_bench=$enableval],
     [use_bench=yes])
 
-AC_ARG_ENABLE([extended-functional-tests],
-    AS_HELP_STRING([--enable-extended-functional-tests],[enable expensive functional tests when using lcov (default no)]),
-    [use_extended_functional_tests=$enableval],
-    [use_extended_functional_tests=no])
+AC_ARG_ENABLE([extended-rpc-tests],
+    AS_HELP_STRING([--enable-extended-rpc-tests],[enable expensive RPC tests when using lcov (default no)]),
+    [use_extended_rpc_tests=$enableval],
+    [use_extended_rpc_tests=no])
 
 AC_ARG_WITH([qrencode],
   [AS_HELP_STRING([--with-qrencode],
@@ -165,28 +158,12 @@ AC_ARG_ENABLE([lcov],
   [enable lcov testing (default is no)])],
   [use_lcov=yes],
   [use_lcov=no])
-  
-AC_ARG_ENABLE([lcov-branch-coverage],
-  [AS_HELP_STRING([--enable-lcov-branch-coverage],
-  [enable lcov testing branch coverage (default is no)])],
-  [use_lcov_branch=yes],
-  [use_lcov_branch=no])
 
 AC_ARG_ENABLE([glibc-back-compat],
   [AS_HELP_STRING([--enable-glibc-back-compat],
   [enable backwards compatibility with glibc])],
   [use_glibc_compat=$enableval],
   [use_glibc_compat=no])
-
-AC_ARG_ENABLE([experimental-asm],
-  [AS_HELP_STRING([--enable-experimental-asm],
-  [Enable experimental assembly routines (default is no)])],
-  [experimental_asm=$enableval],
-  [experimental_asm=no])
-
-if test "x$experimental_asm" = xyes; then
-  AC_DEFINE(EXPERIMENTAL_ASM, 1, [Define this symbol to build in experimental assembly routines])
-fi
 
 AC_ARG_WITH([system-univalue],
   [AS_HELP_STRING([--with-system-univalue],
@@ -215,12 +192,12 @@ AC_ARG_ENABLE([debug],
     [enable_debug=$enableval],
     [enable_debug=no])
 
-# Enable crash hooks
-AC_ARG_ENABLE([crash-hooks],
-    [AS_HELP_STRING([--enable-crash-hooks],
-                    [hook into exception/signal/assert handling to gather stack traces (default is no)])],
-    [enable_crashhooks=$enableval],
-    [enable_crashhooks=no])
+# Enable exception stacktraces
+AC_ARG_ENABLE([stacktraces],
+    [AS_HELP_STRING([--enable-stacktraces],
+                    [gather and print exception stack traces (default is no)])],
+    [enable_stacktraces=$enableval],
+    [enable_stacktraces=no])
 
 # Enable in-wallet miner
 AC_ARG_ENABLE([miner],
@@ -252,10 +229,9 @@ if test "x$enable_debug" = xyes; then
     if test "x$GXX" = xyes; then
         CXXFLAGS="$CXXFLAGS -g3 -O0"
     fi
-else
-    # We always enable at at least -g1 debug info to support proper stacktraces in crash infos
-    # Stacktraces will be suboptimal due to optimization, but better than nothing. Also, -fno-omit-frame-pointer
-    # mitigates this a little bit
+elif test "x$enable_stacktraces" = xyes; then
+    # Enable debug information but don't turn off optimization
+    # (stacktraces will be suboptimal, but better than nothing)
     if test "x$GCC" = xyes; then
         CFLAGS="$CFLAGS -g1 -fno-omit-frame-pointer"
     fi
@@ -265,15 +241,17 @@ else
     fi
 fi
 
-AM_CONDITIONAL([ENABLE_CRASH_HOOKS], [test x$enable_crashhooks = xyes])
-if test "x$enable_crashhooks" = xyes; then
-    AC_DEFINE(ENABLE_CRASH_HOOKS, 1, [Define this symbol if crash hooks should be enabled])
+AM_CONDITIONAL([ENABLE_STACKTRACES], [test x$enable_stacktraces = xyes])
+if test "x$enable_stacktraces" = xyes; then
+    AC_DEFINE(ENABLE_STACKTRACES, 1, [Define this symbol if stacktraces should be enabled])
 fi
 AX_CHECK_LINK_FLAG([-Wl,-wrap=__cxa_allocate_exception], [LINK_WRAP_SUPPORTED=yes],,,)
-AM_CONDITIONAL([CRASH_HOOKS_WRAPPED_CXX_ABI],[test x$LINK_WRAP_SUPPORTED = xyes])
+AX_CHECK_COMPILE_FLAG([-rdynamic], [RDYNAMIC_SUPPORTED=yes],,,)
+AM_CONDITIONAL([STACKTRACE_WRAPPED_CXX_ABI],[test x$LINK_WRAP_SUPPORTED = xyes])
+AM_CONDITIONAL([RDYNAMIC_SUPPORTED],[test x$RDYNAMIC_SUPPORTED = xyes])
 
 if test x$LINK_WRAP_SUPPORTED = "xyes"; then
-  AC_DEFINE(CRASH_HOOKS_WRAPPED_CXX_ABI, 1, [Define this symbol to use wrapped CXX ABIs for exception stacktraces])
+  AC_DEFINE(STACKTRACE_WRAPPED_CXX_ABI, 1, [Define this symbol to use wrapped CXX ABIs for exception stacktraces])],
 fi
 
 # Needed for MinGW targets when debug symbols are enabled as compiled objects get very large
@@ -293,6 +271,7 @@ if test "x$CXXFLAGS_overridden" = "xno"; then
   AX_CHECK_COMPILE_FLAG([-Wformat],[CXXFLAGS="$CXXFLAGS -Wformat"],,[[$CXXFLAG_WERROR]])
   AX_CHECK_COMPILE_FLAG([-Wvla],[CXXFLAGS="$CXXFLAGS -Wvla"],,[[$CXXFLAG_WERROR]])
   AX_CHECK_COMPILE_FLAG([-Wformat-security],[CXXFLAGS="$CXXFLAGS -Wformat-security"],,[[$CXXFLAG_WERROR]])
+  AX_CHECK_COMPILE_FLAG([-Wshadow],[CXXFLAGS="$CXXFLAGS -Wshadow"],,[[$CXXFLAG_WERROR]])
 
   ## Some compilers (gcc) ignore unknown -Wno-* options, but warn about all
   ## unknown options if any other warning is produced. Test the -Wfoo case, and
@@ -302,41 +281,12 @@ if test "x$CXXFLAGS_overridden" = "xno"; then
   AX_CHECK_COMPILE_FLAG([-Wunused-local-typedef],[CXXFLAGS="$CXXFLAGS -Wno-unused-local-typedef"],,[[$CXXFLAG_WERROR]])
   AX_CHECK_COMPILE_FLAG([-Wdeprecated-register],[CXXFLAGS="$CXXFLAGS -Wno-deprecated-register"],,[[$CXXFLAG_WERROR]])
   AX_CHECK_COMPILE_FLAG([-Wimplicit-fallthrough],[CXXFLAGS="$CXXFLAGS -Wno-implicit-fallthrough"],,[[$CXXFLAG_WERROR]])
-
-  # Check for optional instruction set support. Enabling these does _not_ imply that all code will
-  # be compiled with them, rather that specific objects/libs may use them after checking for runtime
-  # compatibility.
-  AX_CHECK_COMPILE_FLAG([-msse4.2],[[SSE42_CXXFLAGS="-msse4.2"]],,[[$CXXFLAG_WERROR]])
-
 fi
-
-TEMP_CXXFLAGS="$CXXFLAGS"
-CXXFLAGS="$CXXFLAGS $SSE42_CXXFLAGS"
-AC_MSG_CHECKING(for assembler crc32 support)
-AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
-    #include <stdint.h>
-    #if defined(_MSC_VER)
-    #include <intrin.h>
-    #elif defined(__GNUC__) && defined(__SSE4_2__)
-    #include <nmmintrin.h>
-    #endif
-  ]],[[
-    uint64_t l = 0;
-    l = _mm_crc32_u8(l, 0);
-    l = _mm_crc32_u32(l, 0);
-    l = _mm_crc32_u64(l, 0);
-    return l;
-  ]])],
- [ AC_MSG_RESULT(yes); enable_hwcrc32=yes],
- [ AC_MSG_RESULT(no)]
-)
-CXXFLAGS="$TEMP_CXXFLAGS"
-
 CPPFLAGS="$CPPFLAGS -DHAVE_BUILD_INFO -D__STDC_FORMAT_MACROS"
 
 AC_ARG_WITH([utils],
   [AS_HELP_STRING([--with-utils],
-  [build dash-cli dash-tx (default=yes)])],
+  [build colonycash-cli colonycash-tx (default=yes)])],
   [build_bitcoin_utils=$withval],
   [build_bitcoin_utils=yes])
 
@@ -348,7 +298,7 @@ AC_ARG_WITH([libs],
 
 AC_ARG_WITH([daemon],
   [AS_HELP_STRING([--with-daemon],
-  [build dashd daemon (default=yes)])],
+  [build colonycashd daemon (default=yes)])],
   [build_bitcoind=$withval],
   [build_bitcoind=yes])
 
@@ -509,8 +459,8 @@ if test x$use_pkgconfig = xyes; then
   ])
 fi
 
-if test x$use_extended_functional_tests != xno; then
-  AC_SUBST(EXTENDED_FUNCTIONAL_TESTS, --extended)
+if test x$use_extended_rpc_tests != xno; then
+  AC_SUBST(EXTENDED_RPC_TESTS, -extended)
 fi
 
 if test x$use_lcov = xyes; then
@@ -531,12 +481,6 @@ if test x$use_lcov = xyes; then
     [AC_MSG_ERROR("lcov testing requested but --coverage linker flag does not work")])
   AX_CHECK_COMPILE_FLAG([--coverage],[CXXFLAGS="$CXXFLAGS --coverage"],
     [AC_MSG_ERROR("lcov testing requested but --coverage flag does not work")])
-  AC_DEFINE(USE_COVERAGE, 1, [Define this symbol if coverage is enabled])
-  CXXFLAGS="$CXXFLAGS -Og"
-fi
-
-if test x$use_lcov_branch != xno; then
-  AC_SUBST(LCOV_OPTS, "$LCOV_OPTS --rc lcov_branch_coverage=1")
 fi
 
 dnl Check for endianness
@@ -545,7 +489,7 @@ AC_C_BIGENDIAN
 dnl Check for pthread compile/link requirements
 AX_PTHREAD
 
-# The following macro will add the necessary defines to dash-config.h, but
+# The following macro will add the necessary defines to colonycash-config.h, but
 # they also need to be passed down to any subprojects. Pull the results out of
 # the cache and add them to CPPFLAGS.
 AC_SYS_LARGEFILE
@@ -651,8 +595,6 @@ AC_CHECK_DECLS([bswap_16, bswap_32, bswap_64],,,
                  #include <byteswap.h>
                  #endif])
 
-AC_CHECK_DECLS([__builtin_clz, __builtin_clzl, __builtin_clzll])
-
 dnl Check for MSG_NOSIGNAL
 AC_MSG_CHECKING(for MSG_NOSIGNAL)
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/socket.h>]],
@@ -661,27 +603,11 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/socket.h>]],
  [ AC_MSG_RESULT(no)]
 )
 
-dnl Check for MSG_DONTWAIT
-AC_MSG_CHECKING(for MSG_DONTWAIT)
-AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/socket.h>]],
- [[ int f = MSG_DONTWAIT; ]])],
- [ AC_MSG_RESULT(yes); AC_DEFINE(HAVE_MSG_DONTWAIT, 1,[Define this symbol if you have MSG_DONTWAIT]) ],
- [ AC_MSG_RESULT(no)]
-)
-
 dnl Check for mallopt(M_ARENA_MAX) (to set glibc arenas)
 AC_MSG_CHECKING(for mallopt M_ARENA_MAX)
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <malloc.h>]],
  [[ mallopt(M_ARENA_MAX, 1); ]])],
  [ AC_MSG_RESULT(yes); AC_DEFINE(HAVE_MALLOPT_ARENA_MAX, 1,[Define this symbol if you have mallopt with M_ARENA_MAX]) ],
- [ AC_MSG_RESULT(no)]
-)
-
-dnl Check for malloc_info (for memory statistics information in getmemoryinfo)
-AC_MSG_CHECKING(for getmemoryinfo)
-AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <malloc.h>]],
- [[ int f = malloc_info(0, NULL); ]])],
- [ AC_MSG_RESULT(yes); AC_DEFINE(HAVE_MALLOC_INFO, 1,[Define this symbol if you have malloc_info]) ],
  [ AC_MSG_RESULT(no)]
 )
 
@@ -780,10 +706,6 @@ AX_BOOST_PROGRAM_OPTIONS
 AX_BOOST_THREAD
 AX_BOOST_CHRONO
 
-dnl Boost 1.56 through 1.62 allow using std::atomic instead of its own atomic
-dnl counter implementations. In 1.63 and later the std::atomic approach is default.
-m4_pattern_allow(DBOOST_AC_USE_STD_ATOMIC) dnl otherwise it's treated like a macro
-BOOST_CPPFLAGS="-DBOOST_SP_USE_STD_ATOMIC -DBOOST_AC_USE_STD_ATOMIC $BOOST_CPPFLAGS"
 
 if test x$use_reduce_exports = xyes; then
   AC_MSG_CHECKING([for working boost reduced exports])
@@ -1067,11 +989,11 @@ AC_SUBST(UNIVALUE_LIBS)
 
 BITCOIN_QT_PATH_PROGS([PROTOC], [protoc],$protoc_bin_path)
 
-AC_MSG_CHECKING([whether to build dashd])
+AC_MSG_CHECKING([whether to build colonycashd])
 AM_CONDITIONAL([BUILD_BITCOIND], [test x$build_bitcoind = xyes])
 AC_MSG_RESULT($build_bitcoind)
 
-AC_MSG_CHECKING([whether to build utils (dash-cli dash-tx)])
+AC_MSG_CHECKING([whether to build utils (colonycash-cli colonycash-tx)])
 AM_CONDITIONAL([BUILD_BITCOIN_UTILS], [test x$build_bitcoin_utils = xyes])
 AC_MSG_RESULT($build_bitcoin_utils)
 
@@ -1079,7 +1001,7 @@ AC_MSG_CHECKING([whether to build libraries])
 AM_CONDITIONAL([BUILD_BITCOIN_LIBS], [test x$build_bitcoin_libs = xyes])
 if test x$build_bitcoin_libs = xyes; then
   AC_DEFINE(HAVE_CONSENSUS_LIB, 1, [Define this symbol if the consensus lib has been built])
-  AC_CONFIG_FILES([libdashconsensus.pc:libdashconsensus.pc.in])
+  AC_CONFIG_FILES([libcolonycashconsensus.pc:libcolonycashconsensus.pc.in])
 fi
 AC_MSG_RESULT($build_bitcoin_libs)
 
@@ -1172,7 +1094,7 @@ if test x$bitcoin_enable_qt != xno; then
     AC_MSG_WARN("xgettext is required to update qt translations")
   fi
 
-  AC_MSG_CHECKING([whether to build test_dash-qt])
+  AC_MSG_CHECKING([whether to build test_colonycash-qt])
   if test x$use_gui_tests$bitcoin_enable_qt_test = xyesyes; then
     AC_MSG_RESULT([yes])
     BUILD_TEST_QT="yes"
@@ -1183,7 +1105,7 @@ fi
 
 AM_CONDITIONAL([ENABLE_ZMQ], [test "x$use_zmq" = "xyes"])
 
-AC_MSG_CHECKING([whether to build test_dash])
+AC_MSG_CHECKING([whether to build test_colonycash])
 if test x$use_tests = xyes; then
   AC_MSG_RESULT([yes])
   BUILD_TEST="yes"
@@ -1198,18 +1120,6 @@ if test x$use_reduce_exports = xyes; then
 else
   AC_MSG_RESULT([no])
 fi
-
-# When compiled natively on MacOS, we need to specify -flat to avoid producing a dSYM bundle
-# When cross-compiled on linux, we're using a different version of the tool that only supports flat symbol files
-AC_MSG_CHECKING([whether dsymutil needs -flat])
-if test x$DSYMUTIL != x && ($DSYMUTIL --help | grep -q \\-flat); then
-AC_MSG_RESULT([yes])
-	DSYMUTIL_FLAT="$DSYMUTIL -flat"
-else
-	AC_MSG_RESULT([no])
-	DSYMUTIL_FLAT="$DSYMUTIL"
-fi
-AC_MSG_RESULT($dsymutil_needs_flat)
 
 if test x$build_bitcoin_utils$build_bitcoin_libs$build_bitcoind$bitcoin_enable_qt$use_bench$use_tests = xnononononono; then
   AC_MSG_ERROR([No targets! Please specify at least one of: --with-utils --with-libs --with-daemon --with-gui --enable-bench or --enable-tests])
@@ -1227,8 +1137,6 @@ AM_CONDITIONAL([USE_QRCODE], [test x$use_qr = xyes])
 AM_CONDITIONAL([USE_LCOV],[test x$use_lcov = xyes])
 AM_CONDITIONAL([GLIBC_BACK_COMPAT],[test x$use_glibc_compat = xyes])
 AM_CONDITIONAL([HARDEN],[test x$use_hardening = xyes])
-AM_CONDITIONAL([ENABLE_HWCRC32],[test x$enable_hwcrc32 = xyes])
-AM_CONDITIONAL([EXPERIMENTAL_ASM],[test x$experimental_asm = xyes])
 
 AC_DEFINE(CLIENT_VERSION_MAJOR, _CLIENT_VERSION_MAJOR, [Major version])
 AC_DEFINE(CLIENT_VERSION_MINOR, _CLIENT_VERSION_MINOR, [Minor version])
@@ -1261,7 +1169,6 @@ AC_SUBST(HARDENED_CPPFLAGS)
 AC_SUBST(HARDENED_LDFLAGS)
 AC_SUBST(PIC_FLAGS)
 AC_SUBST(PIE_FLAGS)
-AC_SUBST(SSE42_CXXFLAGS)
 AC_SUBST(LIBTOOL_APP_LDFLAGS)
 AC_SUBST(USE_UPNP)
 AC_SUBST(USE_QRCODE)
@@ -1277,12 +1184,10 @@ AC_SUBST(EVENT_PTHREADS_LIBS)
 AC_SUBST(ZMQ_LIBS)
 AC_SUBST(PROTOBUF_LIBS)
 AC_SUBST(QR_LIBS)
-AC_SUBST(DSYMUTIL_FLAT)
-AC_CONFIG_FILES([Makefile src/Makefile doc/man/Makefile share/setup.nsi share/qt/Info.plist test/config.ini])
+AC_CONFIG_FILES([Makefile src/Makefile doc/man/Makefile share/setup.nsi share/qt/Info.plist src/test/buildenv.py])
+AC_CONFIG_FILES([qa/pull-tester/tests_config.ini],[chmod +x qa/pull-tester/tests_config.ini])
 AC_CONFIG_FILES([contrib/devtools/split-debug.sh],[chmod +x contrib/devtools/split-debug.sh])
-AC_CONFIG_FILES([doc/Doxyfile])
-AC_CONFIG_LINKS([test/functional/test_runner.py:test/functional/test_runner.py])
-AC_CONFIG_LINKS([test/util/bitcoin-util-test.py:test/util/bitcoin-util-test.py])
+AC_CONFIG_LINKS([qa/pull-tester/rpc-tests.py:qa/pull-tester/rpc-tests.py])
 
 dnl boost's m4 checks do something really nasty: they export these vars. As a
 dnl result, they leak into secp256k1's configure and crazy things happen.
@@ -1330,8 +1235,8 @@ esac
 dnl Replace the BUILDDIR path with the correct Windows path if compiling on Native Windows
 case ${OS} in
    *Windows*)
-     sed  's/BUILDDIR="\/\([[a-z]]\)/BUILDDIR="\1:/'  test/config.ini > test/config-2.ini
-     mv test/config-2.ini test/config.ini
+     sed  's/BUILDDIR="\/\([[a-z]]\)/BUILDDIR="\1:/'  qa/pull-tester/tests_config.py > qa/pull-tester/tests_config-2.py
+     mv qa/pull-tester/tests_config-2.py qa/pull-tester/tests_config.py
    ;;
 esac
 
@@ -1348,7 +1253,7 @@ echo "  with test           = $use_tests"
 echo "  with bench          = $use_bench"
 echo "  with upnp           = $use_upnp"
 echo "  debug enabled       = $enable_debug"
-echo "  crash hooks enabled = $enable_crashhooks"
+echo "  stacktraces enabled = $enable_stacktraces"
 echo "  miner enabled       = $enable_miner"
 echo "  werror              = $enable_werror"
 echo 
@@ -1361,5 +1266,4 @@ echo "  CPPFLAGS            = $CPPFLAGS"
 echo "  CXX                 = $CXX"
 echo "  CXXFLAGS            = $CXXFLAGS"
 echo "  LDFLAGS             = $LDFLAGS"
-echo "  ARFLAGS             = $ARFLAGS"
 echo 

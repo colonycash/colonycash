@@ -12,8 +12,6 @@ unset DISPLAY
 export CCACHE_COMPRESS=${CCACHE_COMPRESS:-1}
 export CCACHE_SIZE=${CCACHE_SIZE:-400M}
 
-if [ "$TRAVIS_EVENT_TYPE" = "pull_request" ]; then contrib/devtools/commit-script-check.sh $TRAVIS_COMMIT_RANGE; fi
-
 #if [ "$CHECK_DOC" = 1 ]; then contrib/devtools/check-doc.py; fi TODO reenable after all Bitcoin PRs have been merged and docs fully fixed
 
 depends/$HOST/native/bin/ccache --max-size=$CCACHE_SIZE
@@ -33,7 +31,7 @@ cd build-ci
 ../configure --cache-file=config.cache $BITCOIN_CONFIG_ALL $BITCOIN_CONFIG || ( cat config.log && false)
 make distdir VERSION=$BUILD_TARGET
 
-cd dashcore-$BUILD_TARGET
+cd colonycashcore-$BUILD_TARGET
 ./configure --cache-file=../config.cache $BITCOIN_CONFIG_ALL $BITCOIN_CONFIG || ( cat config.log && false)
 
 make $MAKEJOBS $GOAL || ( echo "Build failure. Verbose build follows." && make $GOAL V=1 ; false )

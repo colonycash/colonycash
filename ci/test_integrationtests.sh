@@ -8,13 +8,13 @@ PASS_ARGS="$@"
 
 source ./ci/matrix.sh
 
-if [ "$RUN_INTEGRATIONTESTS" != "true" ]; then
+if [ "$RUN_TESTS" != "true" ]; then
   echo "Skipping integration tests"
   exit 0
 fi
 
 export LD_LIBRARY_PATH=$BUILD_DIR/depends/$HOST/lib
 
-cd build-ci/dashcore-$BUILD_TARGET
+cd build-ci/colonycashcore-$BUILD_TARGET
 
-./test/functional/test_runner.py --coverage --quiet $PASS_ARGS
+./qa/pull-tester/rpc-tests.py --coverage $PASS_ARGS

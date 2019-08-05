@@ -6,7 +6,7 @@
 # You'll also have to manually change the executable in the configuration to the correct path of the already built executable
 
 cmake_minimum_required(VERSION 3.7)
-project(dash)
+project(colonycash)
 
 set(CMAKE_CXX_STANDARD 14)
 
@@ -33,45 +33,32 @@ if(DEFINED DEPENDS_PREFIX)
 endif()
 
 add_definitions(
-        -DENABLE_CRASH_HOOKS=1
         -DENABLE_WALLET=1
 )
 
 file(GLOB SOURCE_FILES
-        src/*.cpp
-        src/*.h
         src/bench/*.cpp
         src/bench/*.h
         src/bls/*.cpp
         src/bls/*.h
         src/compat/*.cpp
         src/compat/*.h
-        src/consensus/*.cpp
         src/consensus/*.h
+        src/consensus/*.cpp
         src/crypto/*.c
-        src/crypto/*.cpp
         src/crypto/*.h
-        src/evo/*.cpp
-        src/evo/*.h
+        src/crypto/*.cpp
         src/leveldb/db/*.cc
         src/leveldb/db/*.h
         src/leveldb/include/*.h
-        src/llmq/*.cpp
-        src/llmq/*.h
-        src/masternode/*.cpp
-        src/masternode/*.h
         src/policy/*.cpp
         src/policy/*.h
         src/primitives/*.cpp
         src/primitives/*.h
-        src/privatesend/*.cpp
-        src/privatesend/*.h
-        src/qt/*.cpp
-        src/qt/*.h
         src/qt/test/*.cpp
         src/qt/test/*.h
-        src/rpc/*.cpp
-        src/rpc/*.h
+        src/qt/*.cpp
+        src/qt/*.h
         src/script/*.cpp
         src/script/*.h
         src/secp256k1/include/*.h
@@ -80,11 +67,19 @@ file(GLOB SOURCE_FILES
         src/univalue/include/*.h
         src/univalue/lib/*.cpp
         src/univalue/lib/*.h
+        src/wallet/test/*.cpp
         src/wallet/*.cpp
         src/wallet/*.h
-        src/wallet/test/*.cpp
         src/zmq/*.cpp
         src/zmq/*.h
+        src/*.cpp
+        src/*.h
+        src/evo/*.h
+        src/evo/*.cpp
+        src/llmq/*.h
+        src/llmq/*.cpp
+        src/rpc/*.cpp
+        src/rpc/*.h
         )
 
-add_executable(dash ${SOURCE_FILES})
+add_executable(colonycash ${SOURCE_FILES})
