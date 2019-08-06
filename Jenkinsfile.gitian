@@ -35,7 +35,7 @@ for(int i = 0; i < targets.size(); i++) {
           gitianDescriptor = readYaml file: "contrib/gitian-descriptors/gitian-${target}.yml"
         }
         dir('gitian-builder') {
-          git url: 'https://github.com/colonycashpay/gitian-builder.git'
+          git url: 'https://github.com/colonycash/gitian-builder.git'
         }
         sh "mkdir -p colonycashcore-binaries"
         if (target == "osx") {

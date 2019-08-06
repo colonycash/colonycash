@@ -1,0 +1,13 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=ColonyCash Core
+Comment=ColonyCash P2P Cryptocurrency
+Comment[de]=Verbinde mit dem ColonyCash peer-to-peer Netzwerk
+Comment[fr]=ColonyCash, monnaie virtuelle cryptographique pair à pair
+Comment[tr]=ColonyCash, eşten eşe kriptografik sanal para birimi
+Exec=colonycash-qt %u
+Terminal=false
+Type=Application
+Icon=colonycash128
+MimeType=x-scheme-handler/colonycash;
+Categories=Office;Finance;

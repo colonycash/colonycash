@@ -328,7 +328,7 @@
 #define LT_OBJDIR ".libs/"
 
 /* Define to the address where bug reports for this package should be sent. */
-#define PACKAGE_BUGREPORT "https://github.com/colonycashpay/colonycash/issues"
+#define PACKAGE_BUGREPORT "https://github.com/colonycash/colonycash/issues"
 
 /* Define to the full name of this package. */
 #define PACKAGE_NAME "ColonyCash Core"
@@ -340,7 +340,7 @@
 #define PACKAGE_TARNAME "colonycashcore"
 
 /* Define to the home page for this package. */
-#define PACKAGE_URL "https://colonycash.org/"
+#define PACKAGE_URL "https://colony-cash.com/"
 
 /* Define to the version of this package. */
 #define PACKAGE_VERSION "1.0.0"

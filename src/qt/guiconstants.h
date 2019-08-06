@@ -52,7 +52,7 @@ static const int MAX_URI_LENGTH = 255;
 #define SPINNER_FRAMES 36
 
 #define QAPP_ORG_NAME "ColonyCash"
-#define QAPP_ORG_DOMAIN "colonycash.org"
+#define QAPP_ORG_DOMAIN "colony-cash.com"
 #define QAPP_APP_NAME_DEFAULT "ColonyCash-Qt"
 #define QAPP_APP_NAME_TESTNET "ColonyCash-Qt-testnet"
 #define QAPP_APP_NAME_DEVNET "ColonyCash-Qt-%s"

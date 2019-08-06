@@ -29,7 +29,7 @@ If you're using the automated script (found in [contrib/gitian-build.py](/contri
 Check out the source code in the following directory hierarchy.
 
 	cd /path/to/your/toplevel/build
-	git clone https://github.com/colonycashpay/gitian.sigs.git
+	git clone https://github.com/colonycash/gitian.sigs.git
 	git clone https://github.com/colonycash/colonycash-detached-sigs.git
 	git clone https://github.com/devrandom/gitian-builder.git
 	git clone https://github.com/colonycash/colonycash.git

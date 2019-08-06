@@ -1,0 +1,6 @@
+usr/local/bin/colonycash-qt usr/bin
+share/pixmaps/colonycash32.xpm usr/share/pixmaps
+share/pixmaps/colonycash16.xpm usr/share/pixmaps
+share/pixmaps/colonycash128.png usr/share/pixmaps
+debian/colonycash-qt.desktop usr/share/applications
+debian/colonycash-qt.protocol usr/share/kde4/services/
