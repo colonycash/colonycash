@@ -1,9 +1,9 @@
-// Copyright (c) 2018-2019 The Dash Core developers
+// Copyright (c) 2018 The Dash Core developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef DASH_QUORUMS_BLOCKPROCESSOR_H
-#define DASH_QUORUMS_BLOCKPROCESSOR_H
+#ifndef CCASH_QUORUMS_BLOCKPROCESSOR_H
+#define CCASH_QUORUMS_BLOCKPROCESSOR_H
 
 #include "llmq/quorums_commitment.h"
 #include "llmq/quorums_utils.h"
@@ -66,6 +66,6 @@ private:
 
 extern CQuorumBlockProcessor* quorumBlockProcessor;
 
-} // namespace llmq
+}
 
-#endif//DASH_QUORUMS_BLOCKPROCESSOR_H
+#endif//CCASH_QUORUMS_BLOCKPROCESSOR_H

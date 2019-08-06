@@ -6,7 +6,7 @@
 #include "support/cleanse.h"
 
 #if defined(HAVE_CONFIG_H)
-#include "config/dash-config.h"
+#include "config/colonycash-config.h"
 #endif
 
 #ifdef WIN32
@@ -148,9 +148,9 @@ class Win32LockedPageAllocator: public LockedPageAllocator
 {
 public:
     Win32LockedPageAllocator();
-    void* AllocateLocked(size_t len, bool *lockingSuccess) override;
-    void FreeLocked(void* addr, size_t len) override;
-    size_t GetLimit() override;
+    void* AllocateLocked(size_t len, bool *lockingSuccess);
+    void FreeLocked(void* addr, size_t len);
+    size_t GetLimit();
 private:
     size_t page_size;
 };
@@ -200,9 +200,9 @@ class PosixLockedPageAllocator: public LockedPageAllocator
 {
 public:
     PosixLockedPageAllocator();
-    void* AllocateLocked(size_t len, bool *lockingSuccess) override;
-    void FreeLocked(void* addr, size_t len) override;
-    size_t GetLimit() override;
+    void* AllocateLocked(size_t len, bool *lockingSuccess);
+    void FreeLocked(void* addr, size_t len);
+    size_t GetLimit();
 private:
     size_t page_size;
 };

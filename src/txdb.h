@@ -16,6 +16,8 @@
 #include <utility>
 #include <vector>
 
+#include <boost/function.hpp>
+
 class CBlockIndex;
 class CCoinsViewDBCursor;
 class uint256;
@@ -136,7 +138,7 @@ public:
     bool ReadTimestampIndex(const unsigned int &high, const unsigned int &low, std::vector<uint256> &vect);
     bool WriteFlag(const std::string &name, bool fValue);
     bool ReadFlag(const std::string &name, bool &fValue);
-    bool LoadBlockIndexGuts(const Consensus::Params& consensusParams, std::function<CBlockIndex*(const uint256&)> insertBlockIndex);
+    bool LoadBlockIndexGuts(boost::function<CBlockIndex*(const uint256&)> insertBlockIndex);
 };
 
 #endif // BITCOIN_TXDB_H

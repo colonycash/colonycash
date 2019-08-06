@@ -46,7 +46,7 @@ class Class
         return true;
     }
 }
-} // namespace foo
+}
 ```
 
 Doxygen comments
@@ -133,12 +133,12 @@ Run with the -testnet option to run with "play coins" on the test network, if yo
 are testing multi-machine code that needs to operate across the internet.
 
 If you are testing something that can run on one machine, run with the -regtest option.
-In regression test mode, blocks can be created on-demand; see test/functional/ for tests
+In regression test mode, blocks can be created on-demand; see qa/rpc-tests/ for tests
 that run in -regtest mode.
 
 **DEBUG_LOCKORDER**
 
-Dash Core is a multithreaded application, and deadlocks or other multithreading bugs
+ColonyCash Core is a multithreaded application, and deadlocks or other multithreading bugs
 can be very difficult to track down. Compiling with -DDEBUG_LOCKORDER (configure
 CXXFLAGS="-DDEBUG_LOCKORDER -g") inserts run-time checks to keep track of which locks
 are held, and adds warnings to the debug.log file if inconsistencies are detected.
@@ -173,7 +173,7 @@ Threads
 
 - ThreadMapPort : Universal plug-and-play startup/shutdown
 
-- ThreadSocketHandler : Sends/Receives data from peers on port 9999.
+- ThreadSocketHandler : Sends/Receives data from peers on port 11336.
 
 - ThreadOpenAddedConnections : Opens network connections to added nodes.
 
@@ -187,7 +187,7 @@ Threads
 
 - ThreadFlushWalletDB : Close the wallet.dat file if it hasn't been used in 500ms.
 
-- ThreadRPCServer : Remote procedure call handler, listens on port 9998 for connections and services them.
+- ThreadRPCServer : Remote procedure call handler, listens on port 11335 for connections and services them.
 
 - BitcoinMiner : Generates coins (if wallet is enabled).
 
@@ -199,7 +199,7 @@ Ignoring IDE/editor files
 In closed-source environments in which everyone uses the same IDE it is common
 to add temporary files it produces to the project-wide `.gitignore` file.
 
-However, in open source software such as Dash Core, where everyone uses
+However, in open source software such as ColonyCash Core, where everyone uses
 their own editors/IDE/tools, it is less common. Only you know what files your
 editor produces and this may change from version to version. The canonical way
 to do this is thus to create your local gitignore. Add this to `~/.gitconfig`:
@@ -229,9 +229,9 @@ Development guidelines
 ============================
 
 A few non-style-related recommendations for developers, as well as points to
-pay attention to for reviewers of Dash Core code.
+pay attention to for reviewers of ColonyCash Core code.
 
-General Dash Core
+General ColonyCash Core
 ----------------------
 
 - New features should be exposed on RPC first, then can be made available in the GUI
@@ -255,7 +255,7 @@ Wallet
 
   - *Rationale*: In RPC code that conditionally uses the wallet (such as
     `validateaddress`) it is easy to forget that global pointer `pwalletMain`
-    can be NULL. See `test/functional/disablewallet.py` for functional tests
+    can be NULL. See `qa/rpc-tests/disablewallet.py` for functional tests
     exercising the API with `-disablewallet`
 
 - Include `db_cxx.h` (BerkeleyDB header) only when `ENABLE_WALLET` is set
@@ -267,7 +267,7 @@ General C++
 
 - Assertions should not have side-effects
 
-  - *Rationale*: Even though the source code is set to refuse to compile
+  - *Rationale*: Even though the source code is set to to refuse to compile
     with assertions disabled, having side-effects in assertions is unexpected and
     makes the code harder to understand
 
@@ -341,14 +341,15 @@ Strings and formatting
 
 - For `strprintf`, `LogPrint`, `LogPrintf` formatting characters don't need size specifiers
 
-  - *Rationale*: Dash Core uses tinyformat, which is type safe. Leave them out to avoid confusion
+  - *Rationale*: ColonyCash Core uses tinyformat, which is type safe. Leave them out to avoid confusion
 
 Variable names
 --------------
 
-Although the shadowing warning (`-Wshadow`) is not enabled by default (it prevents issues rising
-from using a different variable with the same name),
-please name variables so that their names do not shadow variables defined in the source code.
+The shadowing warning (`-Wshadow`) is enabled by default. It prevents issues rising
+from using a different variable with the same name.
+
+Please name variables so that their names do not shadow variables defined in the source code.
 
 E.g. in member initializers, prepend `_` to the argument name shadowing the
 member name:
@@ -404,33 +405,10 @@ Source code organization
 
   - *Rationale*: Shorter and simpler header files are easier to read, and reduce compile time
 
-- Every `.cpp` and `.h` file should `#include` every header file it directly uses classes, functions or other
-  definitions from, even if those headers are already included indirectly through other headers. One exception
-  is that a `.cpp` file does not need to re-include the includes already included in its corresponding `.h` file.
-
-  - *Rationale*: Excluding headers because they are already indirectly included results in compilation
-    failures when those indirect dependencies change. Furthermore, it obscures what the real code
-    dependencies are.
-
 - Don't import anything into the global namespace (`using namespace ...`). Use
   fully specified types such as `std::string`.
 
   - *Rationale*: Avoids symbol conflicts
-
-- Terminate namespaces with a comment (`// namespace mynamespace`). The comment
-  should be placed on the same line as the brace closing the namespace, e.g.
-
-```c++
-namespace mynamespace {
-    ...
-} // namespace mynamespace
-
-namespace {
-    ...
-} // namespace
-```
-
-  - *Rationale*: Avoids confusion about the namespace context
 
 GUI
 -----
@@ -451,7 +429,7 @@ directly upstream without being PRed directly against the project.  They will be
 subtree merge.
 
 Others are external projects without a tight relationship with our project.  Changes to these should also
-be sent upstream but bugfixes may also be prudent to PR against Dash Core so that they can be integrated
+be sent upstream but bugfixes may also be prudent to PR against ColonyCash Core so that they can be integrated
 quickly.  Cosmetic changes should be purely taken upstream.
 
 There is a tool in contrib/devtools/git-subtree-check.sh to check a subtree directory for consistency with
@@ -519,76 +497,3 @@ Git and GitHub tips
   This will add an `upstream-pull` remote to your git repository, which can be fetched using `git fetch --all`
   or `git fetch upstream-pull`. Afterwards, you can use `upstream-pull/NUMBER/head` in arguments to `git show`,
   `git checkout` and anywhere a commit id would be acceptable to see the changes from pull request NUMBER.
-
-RPC interface guidelines
---------------------------
-
-A few guidelines for introducing and reviewing new RPC interfaces:
-
-- Method naming: use consecutive lower-case names such as `getrawtransaction` and `submitblock`
-
-  - *Rationale*: Consistency with existing interface.
-
-- Argument naming: use snake case `fee_delta` (and not, e.g. camel case `feeDelta`)
-
-  - *Rationale*: Consistency with existing interface.
-
-- Use the JSON parser for parsing, don't manually parse integers or strings from
-  arguments unless absolutely necessary.
-
-  - *Rationale*: Introduces hand-rolled string manipulation code at both the caller and callee sites,
-    which is error prone, and it is easy to get things such as escaping wrong.
-    JSON already supports nested data structures, no need to re-invent the wheel.
-
-  - *Exception*: AmountToValue can parse amounts as string. This was introduced because many JSON
-    parsers and formatters hard-code handling decimal numbers as floating point
-    values, resulting in potential loss of precision. This is unacceptable for
-    monetary values. **Always** use `AmountToValue` and `ValueToAmount` when
-    inputting or outputting monetary values. The only exceptions to this are
-    `prioritisetransaction` and `getblocktemplate` because their interface
-    is specified as-is in BIP22.
-
-- Missing arguments and 'null' should be treated the same: as default values. If there is no
-  default value, both cases should fail in the same way.
-
-  - *Rationale*: Avoids surprises when switching to name-based arguments. Missing name-based arguments
-  are passed as 'null'.
-
-  - *Exception*: Many legacy exceptions to this exist, one of the worst ones is
-    `getbalance` which follows a completely different code path based on the
-    number of arguments. We are still in the process of cleaning these up. Do not introduce
-    new ones.
-
-- Try not to overload methods on argument type. E.g. don't make `getblock(true)` and `getblock("hash")`
-  do different things.
-
-  - *Rationale*: This is impossible to use with `bitcoin-cli`, and can be surprising to users.
-
-  - *Exception*: Some RPC calls can take both an `int` and `bool`, most notably when a bool was switched
-    to a multi-value, or due to other historical reasons. **Always** have false map to 0 and
-    true to 1 in this case.
-
-- Don't forget to fill in the argument names correctly in the RPC command table.
-
-  - *Rationale*: If not, the call can not be used with name-based arguments.
-
-- Set okSafeMode in the RPC command table to a sensible value: safe mode is when the
-  blockchain is regarded to be in a confused state, and the client deems it unsafe to
-  do anything irreversible such as send. Anything that just queries should be permitted.
-
-  - *Rationale*: Troubleshooting a node in safe mode is difficult if half the
-    RPCs don't work.
-
-- Add every non-string RPC argument `(method, idx, name)` to the table `vRPCConvertParams` in `rpc/client.cpp`.
-
-  - *Rationale*: `bitcoin-cli` and the GUI debug console use this table to determine how to
-    convert a plaintext command line to JSON. If the types don't match, the method can be unusable
-    from there.
-
-- A RPC method must either be a wallet method or a non-wallet method. Do not
-  introduce new methods such as `getinfo` and `signrawtransaction` that differ
-  in behavior based on presence of a wallet.
-
-  - *Rationale*: as well as complicating the implementation and interfering
-    with the introduction of multi-wallet, wallet and non-wallet code should be
-    separated to avoid introducing circular dependencies between code units.

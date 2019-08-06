@@ -1,0 +1,25 @@
+<!DOCTYPE RCC><RCC version="1.0">
+    <qresource prefix="/translations">
+        <file alias="ar">locale/colonycash_ar.qm</file>
+        <file alias="bg">locale/colonycash_bg.qm</file>
+        <file alias="de">locale/colonycash_de.qm</file>
+        <file alias="en">locale/colonycash_en.qm</file>
+        <file alias="es">locale/colonycash_es.qm</file>
+        <file alias="fi">locale/colonycash_fi.qm</file>
+        <file alias="fr">locale/colonycash_fr.qm</file>
+        <file alias="it">locale/colonycash_it.qm</file>
+        <file alias="ja">locale/colonycash_ja.qm</file>
+        <file alias="ko">locale/colonycash_ko.qm</file>
+        <file alias="nl">locale/colonycash_nl.qm</file>
+        <file alias="pl">locale/colonycash_pl.qm</file>
+        <file alias="pt">locale/colonycash_pt.qm</file>
+        <file alias="ru">locale/colonycash_ru.qm</file>
+        <file alias="sk">locale/colonycash_sk.qm</file>
+        <file alias="sv">locale/colonycash_sv.qm</file>
+        <file alias="th">locale/colonycash_th.qm</file>
+        <file alias="tr">locale/colonycash_tr.qm</file>
+        <file alias="vi">locale/colonycash_vi.qm</file>
+        <file alias="zh_CN">locale/colonycash_zh_CN.qm</file>
+        <file alias="zh_TW">locale/colonycash_zh_TW.qm</file>
+    </qresource>
+</RCC>

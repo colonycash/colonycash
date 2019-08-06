@@ -2,8 +2,8 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef DASH_QUORUMS_SIGNING_SHARES_H
-#define DASH_QUORUMS_SIGNING_SHARES_H
+#ifndef CCASH_QUORUMS_SIGNING_SHARES_H
+#define CCASH_QUORUMS_SIGNING_SHARES_H
 
 #include "bls/bls.h"
 #include "chainparams.h"
@@ -34,7 +34,7 @@ typedef std::pair<uint256, uint16_t> SigShareKey;
 class CSigShare
 {
 public:
-    Consensus::LLMQType llmqType;
+    uint8_t llmqType;
     uint256 quorumHash;
     uint16_t quorumMember;
     uint256 id;
@@ -63,7 +63,7 @@ class CSigSesAnn
 {
 public:
     uint32_t sessionId{(uint32_t)-1};
-    Consensus::LLMQType llmqType;
+    uint8_t llmqType;
     uint256 quorumHash;
     uint256 id;
     uint256 msgHash;
@@ -424,6 +424,6 @@ private:
 
 extern CSigSharesManager* quorumSigSharesManager;
 
-} // namespace llmq
+}
 
-#endif //DASH_QUORUMS_SIGNING_SHARES_H
+#endif //CCASH_QUORUMS_SIGNING_SHARES_H

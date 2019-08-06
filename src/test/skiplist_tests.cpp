@@ -4,7 +4,8 @@
 
 #include "chain.h"
 #include "util.h"
-#include "test/test_dash.h"
+#include "test/test_colonycash.h"
+#include "test/test_random.h"
 
 #include <vector>
 
@@ -34,8 +35,8 @@ BOOST_AUTO_TEST_CASE(skiplist_test)
     }
 
     for (int i=0; i < 1000; i++) {
-        int from = InsecureRandRange(SKIPLIST_LENGTH - 1);
-        int to = InsecureRandRange(from + 1);
+        int from = insecure_rand() % (SKIPLIST_LENGTH - 1);
+        int to = insecure_rand() % (from + 1);
 
         BOOST_CHECK(vIndex[SKIPLIST_LENGTH - 1].GetAncestor(from) == &vIndex[from]);
         BOOST_CHECK(vIndex[from].GetAncestor(to) == &vIndex[to]);
@@ -77,7 +78,7 @@ BOOST_AUTO_TEST_CASE(getlocator_test)
 
     // Test 100 random starting points for locators.
     for (int n=0; n<100; n++) {
-        int r = InsecureRandRange(150000);
+        int r = insecure_rand() % 150000;
         CBlockIndex* tip = (r < 100000) ? &vBlocksMain[r] : &vBlocksSide[r - 100000];
         CBlockLocator locator = chain.GetLocator(tip);
 
@@ -115,7 +116,7 @@ BOOST_AUTO_TEST_CASE(findearliestatleast_test)
         } else {
             // randomly choose something in the range [MTP, MTP*2]
             int64_t medianTimePast = vBlocksMain[i].GetMedianTimePast();
-            int r = InsecureRandRange(medianTimePast);
+            int r = insecure_rand() % medianTimePast;
             vBlocksMain[i].nTime = r + medianTimePast;
             vBlocksMain[i].nTimeMax = std::max(vBlocksMain[i].nTime, vBlocksMain[i-1].nTimeMax);
         }
@@ -134,7 +135,7 @@ BOOST_AUTO_TEST_CASE(findearliestatleast_test)
     // Verify that FindEarliestAtLeast is correct.
     for (unsigned int i=0; i<10000; ++i) {
         // Pick a random element in vBlocksMain.
-        int r = InsecureRandRange(vBlocksMain.size());
+        int r = insecure_rand() % vBlocksMain.size();
         int64_t test_time = vBlocksMain[r].nTime;
         CBlockIndex *ret = chain.FindEarliestAtLeast(test_time);
         BOOST_CHECK(ret->nTimeMax >= test_time);
@@ -142,39 +143,4 @@ BOOST_AUTO_TEST_CASE(findearliestatleast_test)
         BOOST_CHECK(vBlocksMain[r].GetAncestor(ret->nHeight) == ret);
     }
 }
-
-BOOST_AUTO_TEST_CASE(findearliestatleast_edge_test)
-{
-    std::list<CBlockIndex> blocks;
-    for (unsigned int timeMax : {100, 100, 100, 200, 200, 200, 300, 300, 300}) {
-        CBlockIndex* prev = blocks.empty() ? nullptr : &blocks.back();
-        blocks.emplace_back();
-        blocks.back().nHeight = prev ? prev->nHeight + 1 : 0;
-        blocks.back().pprev = prev;
-        blocks.back().BuildSkip();
-        blocks.back().nTimeMax = timeMax;
-    }
-
-    CChain chain;
-    chain.SetTip(&blocks.back());
-
-    BOOST_CHECK_EQUAL(chain.FindEarliestAtLeast(50)->nHeight, 0);
-    BOOST_CHECK_EQUAL(chain.FindEarliestAtLeast(100)->nHeight, 0);
-    BOOST_CHECK_EQUAL(chain.FindEarliestAtLeast(150)->nHeight, 3);
-    BOOST_CHECK_EQUAL(chain.FindEarliestAtLeast(200)->nHeight, 3);
-    BOOST_CHECK_EQUAL(chain.FindEarliestAtLeast(250)->nHeight, 6);
-    BOOST_CHECK_EQUAL(chain.FindEarliestAtLeast(300)->nHeight, 6);
-    BOOST_CHECK(!chain.FindEarliestAtLeast(350));
-
-    BOOST_CHECK_EQUAL(chain.FindEarliestAtLeast(0)->nHeight, 0);
-    BOOST_CHECK_EQUAL(chain.FindEarliestAtLeast(-1)->nHeight, 0);
-
-    BOOST_CHECK_EQUAL(chain.FindEarliestAtLeast(std::numeric_limits<int64_t>::min())->nHeight, 0);
-    BOOST_CHECK_EQUAL(chain.FindEarliestAtLeast(std::numeric_limits<unsigned int>::min())->nHeight, 0);
-    BOOST_CHECK_EQUAL(chain.FindEarliestAtLeast(-int64_t(std::numeric_limits<unsigned int>::max()) - 1)->nHeight, 0);
-    BOOST_CHECK(!chain.FindEarliestAtLeast(std::numeric_limits<int64_t>::max()));
-    BOOST_CHECK(!chain.FindEarliestAtLeast(std::numeric_limits<unsigned int>::max()));
-    BOOST_CHECK(!chain.FindEarliestAtLeast(int64_t(std::numeric_limits<unsigned int>::max()) + 1));
-}
-
 BOOST_AUTO_TEST_SUITE_END()

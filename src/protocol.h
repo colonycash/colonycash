@@ -161,9 +161,16 @@ extern const char *PING;
  */
 extern const char *PONG;
 /**
+ * The alert message warns nodes of problems that may affect them or the rest
+ * of the network.
+ * @since protocol version 311.
+ * @see https://bitcoin.org/en/developer-reference#alert
+ */
+extern const char *ALERT;
+/**
  * The notfound message is a reply to a getdata message which requested an
  * object the receiving node does not have available for relay.
- * @since protocol version 70001.
+ * @ince protocol version 70001.
  * @see https://bitcoin.org/en/developer-reference#notfound
  */
 extern const char *NOTFOUND;
@@ -236,10 +243,11 @@ extern const char *GETBLOCKTXN;
  */
 extern const char *BLOCKTXN;
 
-// Dash message types
+// ColonyCash message types
 // NOTE: do NOT declare non-implmented here, we don't want them to be exposed to the outside
 // TODO: add description
-extern const char *LEGACYTXLOCKREQUEST; // only present for backwards compatibility
+extern const char *TXLOCKREQUEST;
+extern const char *TXLOCKVOTE;
 extern const char *SPORK;
 extern const char *GETSPORKS;
 extern const char *DSACCEPT;
@@ -282,15 +290,15 @@ enum ServiceFlags : uint64_t {
     // Nothing
     NODE_NONE = 0,
     // NODE_NETWORK means that the node is capable of serving the block chain. It is currently
-    // set by all Dash Core nodes, and is unset by SPV clients or other peers that just want
+    // set by all ColonyCash Core nodes, and is unset by SPV clients or other peers that just want
     // network services but don't provide them.
     NODE_NETWORK = (1 << 0),
     // NODE_GETUTXO means the node is capable of responding to the getutxo protocol request.
-    // Dash Core does not support this but a patch set called Bitcoin XT does.
+    // ColonyCash Core does not support this but a patch set called Bitcoin XT does.
     // See BIP 64 for details on how this is implemented.
     NODE_GETUTXO = (1 << 1),
     // NODE_BLOOM means the node is capable and willing to handle bloom-filtered connections.
-    // Dash Core nodes used to support this by default, without advertising this bit,
+    // ColonyCash Core nodes used to support this by default, without advertising this bit,
     // but no longer do as of protocol version 70201 (= NO_BLOOM_VERSION)
     NODE_BLOOM = (1 << 2),
     // NODE_XTHIN means the node supports Xtreme Thinblocks
@@ -352,12 +360,12 @@ enum GetDataMsg {
     MSG_BLOCK = 2,
     // The following can only occur in getdata. Invs always use TX or BLOCK.
     MSG_FILTERED_BLOCK = 3,  //!< Defined in BIP37
-    // Dash message types
+    // ColonyCash message types
     // NOTE: declare non-implmented here, we must keep this enum consistent and backwards compatible
-    MSG_LEGACY_TXLOCK_REQUEST = 4,
-    /* MSG_TXLOCK_VOTE = 5, Legacy InstantSend and not used anymore  */
+    MSG_TXLOCK_REQUEST = 4,
+    MSG_TXLOCK_VOTE = 5,
     MSG_SPORK = 6,
-    /* 7 - 15 were used in old Dash versions and were mainly budget and MN broadcast/ping related*/
+    /* 7 - 15 were used in old ColonyCash versions and were mainly budget and MN broadcast/ping related*/
     MSG_DSTX = 16,
     MSG_GOVERNANCE_OBJECT = 17,
     MSG_GOVERNANCE_OBJECT_VOTE = 18,
@@ -383,6 +391,7 @@ class CInv
 public:
     CInv();
     CInv(int typeIn, const uint256& hashIn);
+    CInv(const std::string& strType, const uint256& hashIn);
 
     ADD_SERIALIZE_METHODS;
 
@@ -396,11 +405,8 @@ public:
     friend bool operator<(const CInv& a, const CInv& b);
 
     bool IsKnownType() const;
-    std::string GetCommand() const;
+    const char* GetCommand() const;
     std::string ToString() const;
-
-private:
-    const char* GetCommandInternal() const;
 
     // TODO: make private (improves encapsulation)
 public:

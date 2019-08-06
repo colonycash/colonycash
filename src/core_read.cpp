@@ -18,6 +18,7 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/algorithm/string/split.hpp>
+#include <boost/assign/list_of.hpp>
 
 CScript ParseScript(const std::string& s)
 {
@@ -27,7 +28,7 @@ CScript ParseScript(const std::string& s)
 
     if (mapOpNames.empty())
     {
-        for (unsigned int op = 0; op <= OP_NOP10; op++)
+        for (int op = 0; op <= OP_NOP10; op++)
         {
             // Allow OP_RESERVED to get into mapOpNames
             if (op < OP_NOP && op != OP_RESERVED)

@@ -1,17 +1,15 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
 // Copyright (c) 2014-2019 The Dash Core developers
+// Copyright (c) 2019 The ColonyCash Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "base58.h"
-#include "chain.h"
 #include "clientversion.h"
 #include "init.h"
-#include "httpserver.h"
 #include "net.h"
 #include "netbase.h"
-#include "rpc/blockchain.h"
 #include "rpc/server.h"
 #include "timedata.h"
 #include "txmempool.h"
@@ -23,16 +21,13 @@
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
 #endif
-#include "warnings.h"
 
-#include "masternode/masternode-sync.h"
+#include "masternode-sync.h"
 #include "spork.h"
 
 #include <stdint.h>
-#ifdef HAVE_MALLOC_INFO
-#include <malloc.h>
-#endif
 
+#include <boost/assign/list_of.hpp>
 #include <boost/algorithm/string.hpp>
 
 #include <univalue.h>
@@ -58,16 +53,15 @@ UniValue getinfo(const JSONRPCRequest& request)
             "\nDEPRECATED. Returns an object containing various state info.\n"
             "\nResult:\n"
             "{\n"
-            "  \"deprecation-warning\": \"...\" (string) warning that the getinfo command is deprecated and will be removed in a future version\n"
             "  \"version\": xxxxx,           (numeric) the server version\n"
             "  \"protocolversion\": xxxxx,   (numeric) the protocol version\n"
             "  \"walletversion\": xxxxx,     (numeric) the wallet version\n"
-            "  \"balance\": xxxxxxx,         (numeric) the total dash balance of the wallet\n"
-            "  \"privatesend_balance\": xxxxxx, (numeric) the anonymized dash balance of the wallet\n"
+            "  \"balance\": xxxxxxx,         (numeric) the total colonycash balance of the wallet\n"
+            "  \"privatesend_balance\": xxxxxx, (numeric) the anonymized colonycash balance of the wallet\n"
             "  \"blocks\": xxxxxx,           (numeric) the current number of blocks processed in the server\n"
             "  \"timeoffset\": xxxxx,        (numeric) the time offset\n"
             "  \"connections\": xxxxx,       (numeric) the number of connections\n"
-            "  \"proxy\": \"host:port\",       (string, optional) the proxy used by the server\n"
+            "  \"proxy\": \"host:port\",     (string, optional) the proxy used by the server\n"
             "  \"difficulty\": xxxxxx,       (numeric) the current difficulty\n"
             "  \"testnet\": true|false,      (boolean) if the server is using testnet or not\n"
             "  \"keypoololdest\": xxxxxx,    (numeric) the timestamp (seconds since Unix epoch) of the oldest pre-generated key in the key pool\n"
@@ -75,7 +69,7 @@ UniValue getinfo(const JSONRPCRequest& request)
             "  \"unlocked_until\": ttt,      (numeric) the timestamp in seconds since epoch (midnight Jan 1 1970 GMT) that the wallet is unlocked for transfers, or 0 if the wallet is locked\n"
             "  \"paytxfee\": x.xxxx,         (numeric) the transaction fee set in " + CURRENCY_UNIT + "/kB\n"
             "  \"relayfee\": x.xxxx,         (numeric) minimum relay fee for transactions in " + CURRENCY_UNIT + "/kB\n"
-            "  \"errors\": \"...\"             (string) any error messages\n"
+            "  \"errors\": \"...\"           (string) any error messages\n"
             "}\n"
             "\nExamples:\n"
             + HelpExampleCli("getinfo", "")
@@ -94,15 +88,14 @@ UniValue getinfo(const JSONRPCRequest& request)
     GetProxy(NET_IPV4, proxy);
 
     UniValue obj(UniValue::VOBJ);
-    obj.push_back(Pair("deprecation-warning", "WARNING: getinfo is deprecated and will be fully removed in a future version."
-        " Projects should transition to using getblockchaininfo, getnetworkinfo, and getwalletinfo."));
     obj.push_back(Pair("version", CLIENT_VERSION));
     obj.push_back(Pair("protocolversion", PROTOCOL_VERSION));
 #ifdef ENABLE_WALLET
     if (pwallet) {
         obj.push_back(Pair("walletversion", pwallet->GetVersion()));
         obj.push_back(Pair("balance",       ValueFromAmount(pwallet->GetBalance())));
-        obj.push_back(Pair("privatesend_balance",       ValueFromAmount(pwallet->GetAnonymizedBalance())));
+        if(!fLiteMode)
+            obj.push_back(Pair("privatesend_balance",       ValueFromAmount(pwallet->GetAnonymizedBalance())));
     }
 #endif
     obj.push_back(Pair("blocks",        (int)chainActive.Height()));
@@ -136,34 +129,30 @@ UniValue debug(const JSONRPCRequest& request)
             "\nArguments:\n"
             "1. \"category\"          (string, required) The name of the debug category to turn on. Can be one of the following:\n"
             "                       addrman, alert, bench, cmpctblock, coindb, db, http, leveldb, libevent, lock, mempool,\n"
-            "                       mempoolrej, net, proxy, prune, qt, rand, reindex, rpc, selectcoins, tor, zmq, dash\n"
+            "                       mempoolrej, net, proxy, prune, qt, rand, reindex, rpc, selectcoins, tor, zmq, colonycash\n"
             "                       (or specifically: chainlocks, gobject, instantsend, keepass, llmq, llmq-dkg, llmq-sigs,\n"
-            "                       mnpayments, mnsync, privatesend, spork).\n"
+            "                       masternode, mnpayments, mnsync, privatesend, spork).\n"
             "                       Can also use \"1\" to turn all categories on at once and \"0\" to turn them off.\n"
             "                       Note: If specified category doesn't match any of the above, no error is thrown.\n"
             "\nResult:\n"
             "  result               (string) \"Debug mode: \" followed by the specified category.\n"
             "\nExamples:\n"
-            + HelpExampleCli("debug", "dash")
-            + HelpExampleRpc("debug", "dash+net")
+            + HelpExampleCli("debug", "colonycash")
+            + HelpExampleRpc("debug", "colonycash+net")
         );
 
     std::string strMode = request.params[0].get_str();
-    logCategories = BCLog::NONE;
 
-    std::vector<std::string> categories;
-    boost::split(categories, strMode, boost::is_any_of("+"));
+    std::vector<std::string> newMultiArgs;
+    boost::split(newMultiArgs, strMode, boost::is_any_of("+"));
+    ForceSetMultiArgs("-debug", newMultiArgs);
+    ForceSetArg("-debug", newMultiArgs[newMultiArgs.size() - 1]);
 
-    if (std::find(categories.begin(), categories.end(), std::string("0")) == categories.end()) {
-        for (const auto& cat : categories) {
-            uint64_t flag;
-            if (GetLogCategory(&flag, &cat)) {
-                logCategories |= flag;
-            }
-        }
-    }
+    fDebug = GetArg("-debug", "") != "0";
 
-    return "Debug mode: " + ListActiveLogCategoriesString();
+    ResetLogAcceptCategoryCache();
+
+    return "Debug mode: " + (fDebug ? strMode : "off");
 }
 
 UniValue mnsync(const JSONRPCRequest& request)
@@ -236,7 +225,7 @@ public:
             obj.push_back(Pair("script", GetTxnOutputType(whichType)));
             obj.push_back(Pair("hex", HexStr(subscript.begin(), subscript.end())));
             UniValue a(UniValue::VARR);
-            for (const CTxDestination& addr : addresses)
+            BOOST_FOREACH(const CTxDestination& addr, addresses)
                 a.push_back(CBitcoinAddress(addr).ToString());
             obj.push_back(Pair("addresses", a));
             if (whichType == TX_MULTISIG)
@@ -257,14 +246,16 @@ UniValue spork(const JSONRPCRequest& request)
         std:: string strCommand = request.params[0].get_str();
         if (strCommand == "show") {
             UniValue ret(UniValue::VOBJ);
-            for (const auto& sporkDef : sporkDefs) {
-                ret.push_back(Pair(sporkDef.name, sporkManager.GetSporkValue(sporkDef.sporkId)));
+            for(int nSporkID = SPORK_START; nSporkID <= SPORK_END; nSporkID++){
+                if(sporkManager.GetSporkNameByID(nSporkID) != "Unknown")
+                    ret.push_back(Pair(sporkManager.GetSporkNameByID(nSporkID), sporkManager.GetSporkValue(nSporkID)));
             }
             return ret;
         } else if(strCommand == "active"){
             UniValue ret(UniValue::VOBJ);
-            for (const auto& sporkDef : sporkDefs) {
-                ret.push_back(Pair(sporkDef.name, sporkManager.IsSporkActive(sporkDef.sporkId)));
+            for(int nSporkID = SPORK_START; nSporkID <= SPORK_END; nSporkID++){
+                if(sporkManager.GetSporkNameByID(nSporkID) != "Unknown")
+                    ret.push_back(Pair(sporkManager.GetSporkNameByID(nSporkID), sporkManager.IsSporkActive(nSporkID)));
             }
             return ret;
         }
@@ -293,8 +284,8 @@ UniValue spork(const JSONRPCRequest& request)
             + HelpExampleRpc("spork", "\"show\""));
     } else {
         // advanced mode, update spork values
-        SporkId nSporkID = sporkManager.GetSporkIDByName(request.params[0].get_str());
-        if(nSporkID == SPORK_INVALID)
+        int nSporkID = sporkManager.GetSporkIDByName(request.params[0].get_str());
+        if(nSporkID == -1)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid spork name");
 
         if (!g_connman)
@@ -305,6 +296,7 @@ UniValue spork(const JSONRPCRequest& request)
 
         //broadcast new spork
         if(sporkManager.UpdateSpork(nSporkID, nValue, *g_connman)){
+            sporkManager.ExecuteSpork(nSporkID, nValue);
             return "success";
         } else {
             throw std::runtime_error(
@@ -328,25 +320,17 @@ UniValue validateaddress(const JSONRPCRequest& request)
     if (request.fHelp || request.params.size() != 1)
         throw std::runtime_error(
             "validateaddress \"address\"\n"
-            "\nReturn information about the given dash address.\n"
+            "\nReturn information about the given colonycash address.\n"
             "\nArguments:\n"
-            "1. \"address\"     (string, required) The dash address to validate\n"
+            "1. \"address\"     (string, required) The colonycash address to validate\n"
             "\nResult:\n"
             "{\n"
             "  \"isvalid\" : true|false,       (boolean) If the address is valid or not. If not, this is the only property returned.\n"
-            "  \"address\" : \"address\", (string) The dash address validated\n"
+            "  \"address\" : \"address\", (string) The colonycash address validated\n"
             "  \"scriptPubKey\" : \"hex\",       (string) The hex encoded scriptPubKey generated by the address\n"
             "  \"ismine\" : true|false,        (boolean) If the address is yours or not\n"
             "  \"iswatchonly\" : true|false,   (boolean) If the address is watchonly\n"
             "  \"isscript\" : true|false,      (boolean) If the key is a script\n"
-            "  \"script\" : \"type\"             (string, optional) The output script type. Possible types: nonstandard, pubkey, pubkeyhash, scripthash, multisig, nulldata\n"
-            "  \"hex\" : \"hex\",                (string, optional) The redeemscript for the p2sh address\n"
-            "  \"addresses\"                   (string, optional) Array of addresses associated with the known redeemscript\n"
-            "    [\n"
-            "      \"address\"\n"
-            "      ,...\n"
-            "    ]\n"
-            "  \"sigsrequired\" : xxxxx        (numeric, optional) Number of signatures required to spend multisig output\n"
             "  \"pubkey\" : \"publickeyhex\",    (string) The hex value of the raw public key\n"
             "  \"iscompressed\" : true|false,  (boolean) If the address is compressed\n"
             "  \"account\" : \"account\"         (string) DEPRECATED. The account associated with the address, \"\" is the default account\n"
@@ -383,8 +367,8 @@ UniValue validateaddress(const JSONRPCRequest& request)
 
 #ifdef ENABLE_WALLET
         isminetype mine = pwallet ? IsMine(*pwallet, dest) : ISMINE_NO;
-        ret.push_back(Pair("ismine", bool(mine & ISMINE_SPENDABLE)));
-        ret.push_back(Pair("iswatchonly", bool(mine & ISMINE_WATCH_ONLY)));
+        ret.push_back(Pair("ismine", (mine & ISMINE_SPENDABLE) ? true : false));
+        ret.push_back(Pair("iswatchonly", (mine & ISMINE_WATCH_ONLY) ? true: false));
         UniValue detail = boost::apply_visitor(DescribeAddressVisitor(pwallet), dest);
         ret.pushKVs(detail);
         if (pwallet && pwallet->mapAddressBook.count(dest)) {
@@ -438,7 +422,7 @@ CScript _createmultisig_redeemScript(CWallet * const pwallet, const UniValue& pa
     {
         const std::string& ks = keys[i].get_str();
 #ifdef ENABLE_WALLET
-        // Case 1: Dash address and we have full public key:
+        // Case 1: ColonyCash address and we have full public key:
         CBitcoinAddress address(ks);
         if (pwallet && address.IsValid()) {
             CKeyID keyID;
@@ -495,9 +479,9 @@ UniValue createmultisig(const JSONRPCRequest& request)
 
             "\nArguments:\n"
             "1. nrequired      (numeric, required) The number of required signatures out of the n keys or addresses.\n"
-            "2. \"keys\"       (string, required) A json array of keys which are dash addresses or hex-encoded public keys\n"
+            "2. \"keys\"       (string, required) A json array of keys which are colonycash addresses or hex-encoded public keys\n"
             "     [\n"
-            "       \"key\"    (string) dash address or hex-encoded public key\n"
+            "       \"key\"    (string) colonycash address or hex-encoded public key\n"
             "       ,...\n"
             "     ]\n"
 
@@ -535,7 +519,7 @@ UniValue verifymessage(const JSONRPCRequest& request)
             "verifymessage \"address\" \"signature\" \"message\"\n"
             "\nVerify a signed message\n"
             "\nArguments:\n"
-            "1. \"address\"         (string, required) The dash address to use for the signature.\n"
+            "1. \"address\"         (string, required) The colonycash address to use for the signature.\n"
             "2. \"signature\"       (string, required) The signature provided by the signer in base 64 encoding (see signmessage).\n"
             "3. \"message\"         (string, required) The message that was signed.\n"
             "\nResult:\n"
@@ -645,7 +629,7 @@ UniValue setmocktime(const JSONRPCRequest& request)
     // ensure all call sites of GetTime() are accessing this safely.
     LOCK(cs_main);
 
-    RPCTypeCheck(request.params, {UniValue::VNUM});
+    RPCTypeCheck(request.params, boost::assign::list_of(UniValue::VNUM));
     SetMockTime(request.params[0].get_int64());
 
     return NullUniValue;
@@ -729,7 +713,7 @@ UniValue getaddressmempool(const JSONRPCRequest& request)
             "    \"address\"  (string) The base58check encoded address\n"
             "    \"txid\"  (string) The related txid\n"
             "    \"index\"  (number) The related input or output index\n"
-            "    \"satoshis\"  (number) The difference of duffs\n"
+            "    \"satoshis\"  (number) The difference of Satoshi\n"
             "    \"timestamp\"  (number) The time the transaction entered the mempool (seconds)\n"
             "    \"prevtxid\"  (string) The previous txid (if spending)\n"
             "    \"prevout\"  (string) The previous transaction output index (if spending)\n"
@@ -801,7 +785,7 @@ UniValue getaddressutxos(const JSONRPCRequest& request)
             "    \"txid\"  (string) The output txid\n"
             "    \"outputIndex\"  (number) The output index\n"
             "    \"script\"  (string) The script hex encoded\n"
-            "    \"satoshis\"  (number) The number of duffs of the output\n"
+            "    \"satoshis\"  (number) The number of Satoshi of the output\n"
             "    \"height\"  (number) The block height\n"
             "  }\n"
             "]\n"
@@ -866,7 +850,7 @@ UniValue getaddressdeltas(const JSONRPCRequest& request)
             "\nResult:\n"
             "[\n"
             "  {\n"
-            "    \"satoshis\"  (number) The difference of duffs\n"
+            "    \"satoshis\"  (number) The difference of Satoshi\n"
             "    \"txid\"  (string) The related txid\n"
             "    \"index\"  (number) The related input or output index\n"
             "    \"blockindex\"  (number) The related block index\n"
@@ -951,8 +935,8 @@ UniValue getaddressbalance(const JSONRPCRequest& request)
             "}\n"
             "\nResult:\n"
             "{\n"
-            "  \"balance\"  (string) The current balance in duffs\n"
-            "  \"received\"  (string) The total number of duffs received (including change)\n"
+            "  \"balance\"  (string) The current balance in Satoshi\n"
+            "  \"received\"  (string) The total number of Satoshi received (including change)\n"
             "}\n"
             "\nExamples:\n"
             + HelpExampleCli("getaddressbalance", "'{\"addresses\": [\"XwnLY9Tf7Zsef8gMGL2fhWA9ZmMjt4KPwg\"]}'")
@@ -1134,39 +1118,16 @@ static UniValue RPCLockedMemoryInfo()
     return obj;
 }
 
-#ifdef HAVE_MALLOC_INFO
-static std::string RPCMallocInfo()
-{
-    char *ptr = nullptr;
-    size_t size = 0;
-    FILE *f = open_memstream(&ptr, &size);
-    if (f) {
-        malloc_info(0, f);
-        fclose(f);
-        if (ptr) {
-            std::string rv(ptr, size);
-            free(ptr);
-            return rv;
-        }
-    }
-    return "";
-}
-#endif
-
 UniValue getmemoryinfo(const JSONRPCRequest& request)
 {
     /* Please, avoid using the word "pool" here in the RPC interface or help,
      * as users will undoubtedly confuse it with the other "memory pool"
      */
-    if (request.fHelp || request.params.size() > 1)
+    if (request.fHelp || request.params.size() != 0)
         throw std::runtime_error(
-            "getmemoryinfo (\"mode\")\n"
+            "getmemoryinfo\n"
             "Returns an object containing information about memory usage.\n"
-            "Arguments:\n"
-            "1. \"mode\" determines what kind of information is returned. This argument is optional, the default mode is \"stats\".\n"
-            "  - \"stats\" returns general statistics about memory usage in the daemon.\n"
-            "  - \"mallocinfo\" returns an XML string describing low-level heap state (only available if compiled with glibc 2.10+).\n"
-            "\nResult (mode \"stats\"):\n"
+            "\nResult:\n"
             "{\n"
             "  \"locked\": {               (json object) Information about locked memory manager\n"
             "    \"used\": xxxxx,          (numeric) Number of bytes used\n"
@@ -1177,94 +1138,13 @@ UniValue getmemoryinfo(const JSONRPCRequest& request)
             "    \"chunks_free\": xxxxx,   (numeric) Number unused chunks\n"
             "  }\n"
             "}\n"
-            "\nResult (mode \"mallocinfo\"):\n"
-            "\"<malloc version=\"1\">...\"\n"
             "\nExamples:\n"
             + HelpExampleCli("getmemoryinfo", "")
             + HelpExampleRpc("getmemoryinfo", "")
         );
-
-    std::string mode = (request.params.size() < 1 || request.params[0].isNull()) ? "stats" : request.params[0].get_str();
-    if (mode == "stats") {
-        UniValue obj(UniValue::VOBJ);
-        obj.push_back(Pair("locked", RPCLockedMemoryInfo()));
-        return obj;
-    } else if (mode == "mallocinfo") {
-#ifdef HAVE_MALLOC_INFO
-        return RPCMallocInfo();
-#else
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "mallocinfo is only available when compiled with glibc 2.10+");
-#endif
-    } else {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "unknown mode " + mode);
-    }
-}
-
-uint64_t getCategoryMask(UniValue cats) {
-    cats = cats.get_array();
-    uint64_t mask = 0;
-    for (unsigned int i = 0; i < cats.size(); ++i) {
-        uint64_t flag = 0;
-        std::string cat = cats[i].get_str();
-        if (!GetLogCategory(&flag, &cat)) {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "unknown logging category " + cat);
-        }
-        mask |= flag;
-    }
-    return mask;
-}
-
-UniValue logging(const JSONRPCRequest& request)
-{
-    if (request.fHelp || request.params.size() > 2) {
-        throw std::runtime_error(
-            "logging [include,...] <exclude>\n"
-            "Gets and sets the logging configuration.\n"
-            "When called without an argument, returns the list of categories that are currently being debug logged.\n"
-            "When called with arguments, adds or removes categories from debug logging.\n"
-            "The valid logging categories are: " + ListLogCategories() + "\n"
-            "libevent logging is configured on startup and cannot be modified by this RPC during runtime."
-            "Arguments:\n"
-            "1. \"include\" (array of strings) add debug logging for these categories.\n"
-            "2. \"exclude\" (array of strings) remove debug logging for these categories.\n"
-            "\nResult: <categories>  (string): a list of the logging categories that are active.\n"
-            "\nExamples:\n"
-            + HelpExampleCli("logging", "\"[\\\"all\\\"]\" \"[\\\"http\\\"]\"")
-            + HelpExampleRpc("logging", "[\"all\"], \"[libevent]\"")
-        );
-    }
-
-    uint64_t originalLogCategories = logCategories;
-    if (request.params.size() > 0 && request.params[0].isArray()) {
-        logCategories |= getCategoryMask(request.params[0]);
-    }
-
-    if (request.params.size() > 1 && request.params[1].isArray()) {
-        logCategories &= ~getCategoryMask(request.params[1]);
-    }
-
-    // Update libevent logging if BCLog::LIBEVENT has changed.
-    // If the library version doesn't allow it, UpdateHTTPServerLogging() returns false,
-    // in which case we should clear the BCLog::LIBEVENT flag.
-    // Throw an error if the user has explicitly asked to change only the libevent
-    // flag and it failed.
-    uint64_t changedLogCategories = originalLogCategories ^ logCategories;
-    if (changedLogCategories & BCLog::LIBEVENT) {
-        if (!UpdateHTTPServerLogging(logCategories & BCLog::LIBEVENT)) {
-            logCategories &= ~BCLog::LIBEVENT;
-            if (changedLogCategories == BCLog::LIBEVENT) {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "libevent logging cannot be updated when using libevent before v2.1.1.");
-            }
-        }
-    }
-
-    UniValue result(UniValue::VOBJ);
-    std::vector<CLogCategoryActive> vLogCatActive = ListActiveLogCategories();
-    for (const auto& logCatActive : vLogCatActive) {
-        result.pushKV(logCatActive.category, logCatActive.active);
-    }
-
-    return result;
+    UniValue obj(UniValue::VOBJ);
+    obj.push_back(Pair("locked", RPCLockedMemoryInfo()));
+    return obj;
 }
 
 UniValue echo(const JSONRPCRequest& request)
@@ -1285,7 +1165,7 @@ static const CRPCCommand commands[] =
   //  --------------------- ------------------------  -----------------------  ----------
     { "control",            "debug",                  &debug,                  true,  {} },
     { "control",            "getinfo",                &getinfo,                true,  {} }, /* uses wallet if enabled */
-    { "control",            "getmemoryinfo",          &getmemoryinfo,          true,  {"mode"} },
+    { "control",            "getmemoryinfo",          &getmemoryinfo,          true,  {} },
     { "util",               "validateaddress",        &validateaddress,        true,  {"address"} }, /* uses wallet if enabled */
     { "util",               "createmultisig",         &createmultisig,         true,  {"nrequired","keys"} },
     { "util",               "verifymessage",          &verifymessage,          true,  {"address","signature","message"} },
@@ -1299,15 +1179,14 @@ static const CRPCCommand commands[] =
     { "addressindex",       "getaddresstxids",        &getaddresstxids,        false, {"addresses"} },
     { "addressindex",       "getaddressbalance",      &getaddressbalance,      false, {"addresses"} },
 
-    /* Dash features */
-    { "dash",               "mnsync",                 &mnsync,                 true,  {} },
-    { "dash",               "spork",                  &spork,                  true,  {"value"} },
+    /* ColonyCash features */
+    { "colonycash",               "mnsync",                 &mnsync,                 true,  {} },
+    { "colonycash",               "spork",                  &spork,                  true,  {"value"} },
 
     /* Not shown in help */
     { "hidden",             "setmocktime",            &setmocktime,            true,  {"timestamp"}},
     { "hidden",             "echo",                   &echo,                   true,  {"arg0","arg1","arg2","arg3","arg4","arg5","arg6","arg7","arg8","arg9"}},
     { "hidden",             "echojson",               &echo,                   true,  {"arg0","arg1","arg2","arg3","arg4","arg5","arg6","arg7","arg8","arg9"}},
-    { "hidden",             "logging",                &logging,                true,  {"include", "exclude"}},
 };
 
 void RegisterMiscRPCCommands(CRPCTable &t)

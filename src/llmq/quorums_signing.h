@@ -2,8 +2,8 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef DASH_QUORUMS_SIGNING_H
-#define DASH_QUORUMS_SIGNING_H
+#ifndef CCASH_QUORUMS_SIGNING_H
+#define CCASH_QUORUMS_SIGNING_H
 
 #include "llmq/quorums.h"
 
@@ -21,7 +21,7 @@ namespace llmq
 class CRecoveredSig
 {
 public:
-    Consensus::LLMQType llmqType;
+    uint8_t llmqType;
     uint256 quorumHash;
     uint256 id;
     uint256 msgHash;
@@ -179,6 +179,6 @@ public:
 
 extern CSigningManager* quorumSigningManager;
 
-} // namespace llmq
+}
 
-#endif //DASH_QUORUMS_SIGNING_H
+#endif //CCASH_QUORUMS_SIGNING_H

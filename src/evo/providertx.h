@@ -2,19 +2,18 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef DASH_PROVIDERTX_H
-#define DASH_PROVIDERTX_H
+#ifndef CCASH_PROVIDERTX_H
+#define CCASH_PROVIDERTX_H
 
 #include "bls/bls.h"
 #include "consensus/validation.h"
 #include "primitives/transaction.h"
 
-#include "base58.h"
 #include "netaddress.h"
 #include "pubkey.h"
-#include "univalue.h"
 
 class CBlockIndex;
+class UniValue;
 
 class CProRegTx
 {
@@ -50,7 +49,7 @@ public:
         READWRITE(pubKeyOperator);
         READWRITE(keyIDVoting);
         READWRITE(nOperatorReward);
-        READWRITE(scriptPayout);
+        READWRITE(*(CScriptBase*)(&scriptPayout));
         READWRITE(inputsHash);
         if (!(s.GetType() & SER_GETHASH)) {
             READWRITE(vchSig);
@@ -62,28 +61,7 @@ public:
     std::string MakeSignString() const;
 
     std::string ToString() const;
-
-    void ToJson(UniValue& obj) const
-    {
-        obj.clear();
-        obj.setObject();
-        obj.push_back(Pair("version", nVersion));
-        obj.push_back(Pair("collateralHash", collateralOutpoint.hash.ToString()));
-        obj.push_back(Pair("collateralIndex", (int)collateralOutpoint.n));
-        obj.push_back(Pair("service", addr.ToString(false)));
-        obj.push_back(Pair("ownerAddress", CBitcoinAddress(keyIDOwner).ToString()));
-        obj.push_back(Pair("votingAddress", CBitcoinAddress(keyIDVoting).ToString()));
-
-        CTxDestination dest;
-        if (ExtractDestination(scriptPayout, dest)) {
-            CBitcoinAddress bitcoinAddress(dest);
-            obj.push_back(Pair("payoutAddress", bitcoinAddress.ToString()));
-        }
-        obj.push_back(Pair("pubKeyOperator", pubKeyOperator.ToString()));
-        obj.push_back(Pair("operatorReward", (double)nOperatorReward / 100));
-
-        obj.push_back(Pair("inputsHash", inputsHash.ToString()));
-    }
+    void ToJson(UniValue& obj) const;
 };
 
 class CProUpServTx
@@ -108,7 +86,7 @@ public:
         READWRITE(nVersion);
         READWRITE(proTxHash);
         READWRITE(addr);
-        READWRITE(scriptOperatorPayout);
+        READWRITE(*(CScriptBase*)(&scriptOperatorPayout));
         READWRITE(inputsHash);
         if (!(s.GetType() & SER_GETHASH)) {
             READWRITE(sig);
@@ -117,21 +95,7 @@ public:
 
 public:
     std::string ToString() const;
-
-    void ToJson(UniValue& obj) const
-    {
-        obj.clear();
-        obj.setObject();
-        obj.push_back(Pair("version", nVersion));
-        obj.push_back(Pair("proTxHash", proTxHash.ToString()));
-        obj.push_back(Pair("service", addr.ToString(false)));
-        CTxDestination dest;
-        if (ExtractDestination(scriptOperatorPayout, dest)) {
-            CBitcoinAddress bitcoinAddress(dest);
-            obj.push_back(Pair("operatorPayoutAddress", bitcoinAddress.ToString()));
-        }
-        obj.push_back(Pair("inputsHash", inputsHash.ToString()));
-    }
+    void ToJson(UniValue& obj) const;
 };
 
 class CProUpRegTx
@@ -160,7 +124,7 @@ public:
         READWRITE(nMode);
         READWRITE(pubKeyOperator);
         READWRITE(keyIDVoting);
-        READWRITE(scriptPayout);
+        READWRITE(*(CScriptBase*)(&scriptPayout));
         READWRITE(inputsHash);
         if (!(s.GetType() & SER_GETHASH)) {
             READWRITE(vchSig);
@@ -169,22 +133,7 @@ public:
 
 public:
     std::string ToString() const;
-
-    void ToJson(UniValue& obj) const
-    {
-        obj.clear();
-        obj.setObject();
-        obj.push_back(Pair("version", nVersion));
-        obj.push_back(Pair("proTxHash", proTxHash.ToString()));
-        obj.push_back(Pair("votingAddress", CBitcoinAddress(keyIDVoting).ToString()));
-        CTxDestination dest;
-        if (ExtractDestination(scriptPayout, dest)) {
-            CBitcoinAddress bitcoinAddress(dest);
-            obj.push_back(Pair("payoutAddress", bitcoinAddress.ToString()));
-        }
-        obj.push_back(Pair("pubKeyOperator", pubKeyOperator.ToString()));
-        obj.push_back(Pair("inputsHash", inputsHash.ToString()));
-    }
+    void ToJson(UniValue& obj) const;
 };
 
 class CProUpRevTx
@@ -225,16 +174,7 @@ public:
 
 public:
     std::string ToString() const;
-
-    void ToJson(UniValue& obj) const
-    {
-        obj.clear();
-        obj.setObject();
-        obj.push_back(Pair("version", nVersion));
-        obj.push_back(Pair("proTxHash", proTxHash.ToString()));
-        obj.push_back(Pair("reason", (int)nReason));
-        obj.push_back(Pair("inputsHash", inputsHash.ToString()));
-    }
+    void ToJson(UniValue& obj) const;
 };
 
 
@@ -243,4 +183,4 @@ bool CheckProUpServTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CVa
 bool CheckProUpRegTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CValidationState& state);
 bool CheckProUpRevTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CValidationState& state);
 
-#endif //DASH_PROVIDERTX_H
+#endif //CCASH_PROVIDERTX_H

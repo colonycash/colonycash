@@ -2,8 +2,8 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef DASH_QUORUMS_CHAINLOCKS_H
-#define DASH_QUORUMS_CHAINLOCKS_H
+#ifndef CCASH_QUORUMS_CHAINLOCKS_H
+#define CCASH_QUORUMS_CHAINLOCKS_H
 
 #include "llmq/quorums.h"
 #include "llmq/quorums_signing.h"
@@ -90,9 +90,7 @@ public:
     void ProcessNewChainLock(NodeId from, const CChainLockSig& clsig, const uint256& hash);
     void AcceptedBlockHeader(const CBlockIndex* pindexNew);
     void UpdatedBlockTip(const CBlockIndex* pindexNew);
-    void TransactionAddedToMempool(const CTransactionRef& tx);
-    void BlockConnected(const std::shared_ptr<const CBlock>& pblock, const CBlockIndex* pindex, const std::vector<CTransactionRef>& vtxConflicted);
-    void BlockDisconnected(const std::shared_ptr<const CBlock>& pblock, const CBlockIndex* pindexDisconnected);
+    void SyncTransaction(const CTransaction &tx, const CBlockIndex *pindex, int posInBlock);
     void CheckActiveState();
     void TrySignChainTip();
     void EnforceBestChainLock();
@@ -118,6 +116,6 @@ private:
 extern CChainLocksHandler* chainLocksHandler;
 
 
-} // namespace llmq
+}
 
-#endif //DASH_QUORUMS_CHAINLOCKS_H
+#endif //CCASH_QUORUMS_CHAINLOCKS_H

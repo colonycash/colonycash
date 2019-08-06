@@ -8,32 +8,11 @@
 #include "policy/policy.h"
 
 #include "validation.h"
-#include "coins.h"
 #include "tinyformat.h"
 #include "util.h"
 #include "utilstrencodings.h"
 
-
-CAmount GetDustThreshold(const CTxOut& txout, const CFeeRate& dustRelayFeeIn)
-{
-    // "Dust" is defined in terms of CTransaction::minRelayTxFee, which has units duffs-per-kilobyte.
-    // If you'd pay more than 1/3 in fees to spend something, then we consider it dust.
-    // A typical spendable txout is 34 bytes big, and will need a CTxIn of at least 148 bytes to spend
-    // i.e. total is 148 + 34 = 182 bytes. Default -minrelaytxfee is 1000 duffs per kB
-    // and that means that fee per spendable txout is 182 * 1000 / 1000 = 182 duffs.
-    // So dust is a spendable txout less than 546 * minRelayTxFee / 1000 (in duffs)
-    // i.e. 182 * 3 = 546 duffs with default -minrelaytxfee = minRelayTxFee = 1000 duffs per kB.
-    if (txout.scriptPubKey.IsUnspendable())
-        return 0;
-
-    size_t nSize = GetSerializeSize(txout, SER_DISK, 0)+148u;
-    return 3 * dustRelayFeeIn.GetFee(nSize);
-}
-
-bool IsDust(const CTxOut& txout, const CFeeRate& dustRelayFeeIn)
-{
-    return (txout.nValue < GetDustThreshold(txout, dustRelayFeeIn));
-}
+#include <boost/foreach.hpp>
 
     /**
      * Check transaction inputs to mitigate two
@@ -91,7 +70,7 @@ bool IsStandardTx(const CTransaction& tx, std::string& reason)
         return false;
     }
 
-    for (const CTxIn& txin : tx.vin)
+    BOOST_FOREACH(const CTxIn& txin, tx.vin)
     {
         // Biggest 'standard' txin is a 15-of-15 P2SH multisig with compressed
         // keys (remember the 520 byte limit on redeemScript size). That works
@@ -112,7 +91,7 @@ bool IsStandardTx(const CTransaction& tx, std::string& reason)
 
     unsigned int nDataOut = 0;
     txnouttype whichType;
-    for (const CTxOut& txout : tx.vout) {
+    BOOST_FOREACH(const CTxOut& txout, tx.vout) {
         if (!::IsStandard(txout.scriptPubKey, whichType)) {
             reason = "scriptpubkey";
             return false;
@@ -123,7 +102,7 @@ bool IsStandardTx(const CTransaction& tx, std::string& reason)
         else if ((whichType == TX_MULTISIG) && (!fIsBareMultisigStd)) {
             reason = "bare-multisig";
             return false;
-        } else if (IsDust(txout, ::dustRelayFee)) {
+        } else if (txout.IsDust(dustRelayFee)) {
             reason = "dust";
             return false;
         }

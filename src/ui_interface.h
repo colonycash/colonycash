@@ -12,7 +12,9 @@
 #include <boost/signals2/last_value.hpp>
 #include <boost/signals2/signal.hpp>
 
+class CBasicKeyStore;
 class CWallet;
+class uint256;
 class CBlockIndex;
 class CDeterministicMNList;
 
@@ -88,9 +90,10 @@ public:
     boost::signals2::signal<void (bool networkActive)> NotifyNetworkActiveChanged;
 
     /**
-     * Status bar alerts changed.
+     * New, updated or cancelled alert.
+     * @note called with lock cs_mapAlerts held.
      */
-    boost::signals2::signal<void ()> NotifyAlertChanged;
+    boost::signals2::signal<void (const uint256 &hash, ChangeType status)> NotifyAlertChanged;
 
     /** A wallet has been loaded. */
     boost::signals2::signal<void (CWallet* wallet)> LoadWallet;

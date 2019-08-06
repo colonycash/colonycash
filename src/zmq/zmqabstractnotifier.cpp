@@ -16,7 +16,7 @@ bool CZMQAbstractNotifier::NotifyBlock(const CBlockIndex * /*CBlockIndex*/)
     return true;
 }
 
-bool CZMQAbstractNotifier::NotifyChainLock(const CBlockIndex * /*CBlockIndex*/, const llmq::CChainLockSig& /*clsig*/)
+bool CZMQAbstractNotifier::NotifyChainLock(const CBlockIndex * /*CBlockIndex*/)
 {
     return true;
 }
@@ -26,7 +26,7 @@ bool CZMQAbstractNotifier::NotifyTransaction(const CTransaction &/*transaction*/
     return true;
 }
 
-bool CZMQAbstractNotifier::NotifyTransactionLock(const CTransaction &/*transaction*/, const llmq::CInstantSendLock& /*islock*/)
+bool CZMQAbstractNotifier::NotifyTransactionLock(const CTransaction &/*transaction*/)
 {
     return true;
 }

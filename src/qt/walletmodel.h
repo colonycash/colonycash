@@ -54,6 +54,7 @@ public:
 #ifdef ENABLE_WALLET
     AvailableCoinsType inputType;
 #endif // ENABLE_WALLET
+    bool fUseInstantSend;
     CAmount amount;
     // If from a payment request, this is used for storing the memo
     QString message;
@@ -226,6 +227,8 @@ public:
 
     int getDefaultConfirmTarget() const;
     int getNumISLocks() const;
+
+    bool IsOldInstantSendEnabled() const;
 
 private:
     CWallet *wallet;

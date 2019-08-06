@@ -9,7 +9,7 @@
 #include "quorums_utils.h"
 
 #include "chain.h"
-#include "masternode/masternode-sync.h"
+#include "masternode-sync.h"
 #include "net_processing.h"
 #include "scheduler.h"
 #include "spork.h"
@@ -84,7 +84,7 @@ void CChainLocksHandler::ProcessMessage(CNode* pfrom, const std::string& strComm
 
         auto hash = ::SerializeHash(clsig);
 
-        ProcessNewChainLock(pfrom->GetId(), clsig, hash);
+        ProcessNewChainLock(pfrom->id, clsig, hash);
     }
 }
 
@@ -159,7 +159,7 @@ void CChainLocksHandler::ProcessNewChainLock(NodeId from, const llmq::CChainLock
         EnforceBestChainLock();
     }, 0);
 
-    LogPrint(BCLog::CHAINLOCKS, "CChainLocksHandler::%s -- processed new CLSIG (%s), peer=%d\n",
+    LogPrint("chainlocks", "CChainLocksHandler::%s -- processed new CLSIG (%s), peer=%d\n",
               __func__, clsig.ToString(), from);
 }
 
@@ -280,24 +280,24 @@ void CChainLocksHandler::TrySignChainTip()
         }
     }
 
-    LogPrint(BCLog::CHAINLOCKS, "CChainLocksHandler::%s -- trying to sign %s, height=%d\n", __func__, pindex->GetBlockHash().ToString(), pindex->nHeight);
+    LogPrint("chainlocks", "CChainLocksHandler::%s -- trying to sign %s, height=%d\n", __func__, pindex->GetBlockHash().ToString(), pindex->nHeight);
 
     // When the new IX system is activated, we only try to ChainLock blocks which include safe transactions. A TX is
     // considered safe when it is ixlocked or at least known since 10 minutes (from mempool or block). These checks are
     // performed for the tip (which we try to sign) and the previous 5 blocks. If a ChainLocked block is found on the
     // way down, we consider all TXs to be safe.
-    if (IsInstantSendEnabled() && sporkManager.IsSporkActive(SPORK_3_INSTANTSEND_BLOCK_FILTERING)) {
+    if (IsNewInstantSendEnabled() && sporkManager.IsSporkActive(SPORK_3_INSTANTSEND_BLOCK_FILTERING)) {
         auto pindexWalk = pindex;
         while (pindexWalk) {
             if (pindex->nHeight - pindexWalk->nHeight > 5) {
                 // no need to check further down, 6 confs is safe to assume that TXs below this height won't be
                 // ixlocked anymore if they aren't already
-                LogPrint(BCLog::CHAINLOCKS, "CChainLocksHandler::%s -- tip and previous 5 blocks all safe\n", __func__);
+                LogPrint("chainlocks", "CChainLocksHandler::%s -- tip and previous 5 blocks all safe\n", __func__);
                 break;
             }
             if (HasChainLock(pindexWalk->nHeight, pindexWalk->GetBlockHash())) {
                 // we don't care about ixlocks for TXs that are ChainLocked already
-                LogPrint(BCLog::CHAINLOCKS, "CChainLocksHandler::%s -- chainlock at height %d \n", __func__, pindexWalk->nHeight);
+                LogPrint("chainlocks", "CChainLocksHandler::%s -- chainlock at height %d \n", __func__, pindexWalk->nHeight);
                 break;
             }
 
@@ -318,7 +318,7 @@ void CChainLocksHandler::TrySignChainTip()
                 }
 
                 if (txAge < WAIT_FOR_ISLOCK_TIMEOUT && !quorumInstantSendManager->IsLocked(txid)) {
-                    LogPrint(BCLog::CHAINLOCKS, "CChainLocksHandler::%s -- not signing block %s due to TX %s not being ixlocked and not old enough. age=%d\n", __func__,
+                    LogPrint("chainlocks", "CChainLocksHandler::%s -- not signing block %s due to TX %s not being ixlocked and not old enough. age=%d\n", __func__,
                               pindexWalk->GetBlockHash().ToString(), txid.ToString(), txAge);
                     return;
                 }
@@ -345,58 +345,38 @@ void CChainLocksHandler::TrySignChainTip()
     quorumSigningManager->AsyncSignIfMember(Params().GetConsensus().llmqChainLocks, requestId, msgHash);
 }
 
-void CChainLocksHandler::TransactionAddedToMempool(const CTransactionRef& tx)
+void CChainLocksHandler::SyncTransaction(const CTransaction& tx, const CBlockIndex* pindex, int posInBlock)
 {
-    if (tx->IsCoinBase() || tx->vin.empty()) {
+    if (!masternodeSync.IsBlockchainSynced()) {
         return;
     }
 
-    if (!masternodeSync.IsBlockchainSynced()) {
-        return;
+    bool handleTx = true;
+    if (tx.IsCoinBase() || tx.vin.empty()) {
+        handleTx = false;
     }
 
     LOCK(cs);
-    int64_t curTime = GetAdjustedTime();
-    txFirstSeenTime.emplace(tx->GetHash(), curTime);
-}
 
-void CChainLocksHandler::BlockConnected(const std::shared_ptr<const CBlock>& pblock, const CBlockIndex* pindex, const std::vector<CTransactionRef>& vtxConflicted)
-{
-    if (!masternodeSync.IsBlockchainSynced()) {
-        return;
+    if (handleTx) {
+        int64_t curTime = GetAdjustedTime();
+        txFirstSeenTime.emplace(tx.GetHash(), curTime);
     }
 
-    // We listen for BlockConnected so that we can collect all TX ids of all included TXs of newly received blocks
+    // We listen for SyncTransaction so that we can collect all TX ids of all included TXs of newly received blocks
     // We need this information later when we try to sign a new tip, so that we can determine if all included TXs are
     // safe.
-
-    LOCK(cs);
-
-    auto it = blockTxs.find(pindex->GetBlockHash());
-    if (it == blockTxs.end()) {
-        // we must create this entry even if there are no lockable transactions in the block, so that TrySignChainTip
-        // later knows about this block
-        it = blockTxs.emplace(pindex->GetBlockHash(), std::make_shared<std::unordered_set<uint256, StaticSaltedHasher>>()).first;
-    }
-    auto& txids = *it->second;
-
-    int64_t curTime = GetAdjustedTime();
-
-    for (const auto& tx : pblock->vtx) {
-        if (tx->IsCoinBase() || tx->vin.empty()) {
-            continue;
+    if (pindex && posInBlock != CMainSignals::SYNC_TRANSACTION_NOT_IN_BLOCK) {
+        auto it = blockTxs.find(pindex->GetBlockHash());
+        if (it == blockTxs.end()) {
+            // we want this to be run even if handleTx == false, so that the coinbase TX triggers creation of an empty entry
+            it = blockTxs.emplace(pindex->GetBlockHash(), std::make_shared<std::unordered_set<uint256, StaticSaltedHasher>>()).first;
         }
-
-        txids.emplace(tx->GetHash());
-        txFirstSeenTime.emplace(tx->GetHash(), curTime);
+        if (handleTx) {
+            auto& txs = *it->second;
+            txs.emplace(tx.GetHash());
+        }
     }
-
-}
-
-void CChainLocksHandler::BlockDisconnected(const std::shared_ptr<const CBlock>& pblock, const CBlockIndex* pindexDisconnected)
-{
-    LOCK(cs);
-    blockTxs.erase(pindexDisconnected->GetBlockHash());
 }
 
 CChainLocksHandler::BlockTxs::mapped_type CChainLocksHandler::GetBlockTxs(const uint256& blockHash)
@@ -416,7 +396,7 @@ CChainLocksHandler::BlockTxs::mapped_type CChainLocksHandler::GetBlockTxs(const 
     if (!ret) {
         // This should only happen when freshly started.
         // If running for some time, SyncTransaction should have been called before which fills blockTxs.
-        LogPrint(BCLog::CHAINLOCKS, "CChainLocksHandler::%s -- blockTxs for %s not found. Trying ReadBlockFromDisk\n", __func__,
+        LogPrint("chainlocks", "CChainLocksHandler::%s -- blockTxs for %s not found. Trying ReadBlockFromDisk\n", __func__,
                  blockHash.ToString());
 
         uint32_t blockTime;
@@ -453,7 +433,7 @@ bool CChainLocksHandler::IsTxSafeForMining(const uint256& txid)
     if (!sporkManager.IsSporkActive(SPORK_3_INSTANTSEND_BLOCK_FILTERING)) {
         return true;
     }
-    if (!IsInstantSendEnabled()) {
+    if (!IsNewInstantSendEnabled()) {
         return true;
     }
 
@@ -546,7 +526,7 @@ void CChainLocksHandler::EnforceBestChainLock()
     }
 
     if (pindexNotify) {
-        GetMainSignals().NotifyChainLock(pindexNotify, clsig);
+        GetMainSignals().NotifyChainLock(pindexNotify);
     }
 }
 
@@ -724,4 +704,4 @@ void CChainLocksHandler::Cleanup()
     lastCleanupTime = GetTimeMillis();
 }
 
-} // namespace llmq
+}

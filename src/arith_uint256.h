@@ -31,16 +31,12 @@ public:
 
     base_uint()
     {
-        static_assert(BITS/32 > 0 && BITS%32 == 0, "Template parameter BITS must be a positive multiple of 32.");
-
         for (int i = 0; i < WIDTH; i++)
             pn[i] = 0;
     }
 
     base_uint(const base_uint& b)
     {
-        static_assert(BITS/32 > 0 && BITS%32 == 0, "Template parameter BITS must be a positive multiple of 32.");
-
         for (int i = 0; i < WIDTH; i++)
             pn[i] = b.pn[i];
     }
@@ -54,8 +50,6 @@ public:
 
     base_uint(uint64_t b)
     {
-        static_assert(BITS/32 > 0 && BITS%32 == 0, "Template parameter BITS must be a positive multiple of 32.");
-
         pn[0] = (unsigned int)b;
         pn[1] = (unsigned int)(b >> 32);
         for (int i = 2; i < WIDTH; i++)
@@ -180,7 +174,7 @@ public:
     {
         // prefix operator
         int i = 0;
-        while (i < WIDTH && ++pn[i] == 0)
+        while (++pn[i] == 0 && i < WIDTH-1)
             i++;
         return *this;
     }
@@ -197,7 +191,7 @@ public:
     {
         // prefix operator
         int i = 0;
-        while (i < WIDTH && --pn[i] == (uint32_t)-1)
+        while (--pn[i] == (uint32_t)-1 && i < WIDTH-1)
             i++;
         return *this;
     }
