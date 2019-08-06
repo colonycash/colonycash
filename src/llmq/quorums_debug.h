@@ -2,8 +2,8 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef DASH_QUORUMS_DEBUG_H
-#define DASH_QUORUMS_DEBUG_H
+#ifndef CCASH_QUORUMS_DEBUG_H
+#define CCASH_QUORUMS_DEBUG_H
 
 #include "consensus/params.h"
 #include "sync.h"
@@ -47,7 +47,7 @@ public:
 class CDKGDebugSessionStatus
 {
 public:
-    Consensus::LLMQType llmqType{Consensus::LLMQ_NONE};
+    uint8_t llmqType{Consensus::LLMQ_NONE};
     uint256 quorumHash;
     uint32_t quorumHeight{0};
     uint8_t phase{0};
@@ -79,7 +79,7 @@ class CDKGDebugStatus
 public:
     int64_t nTime{0};
 
-    std::map<Consensus::LLMQType, CDKGDebugSessionStatus> sessions;
+    std::map<uint8_t, CDKGDebugSessionStatus> sessions;
 
 public:
     UniValue ToJson(int detailLevel) const;
@@ -106,6 +106,6 @@ public:
 
 extern CDKGDebugManager* quorumDKGDebugManager;
 
-} // namespace llmq
+}
 
-#endif //DASH_QUORUMS_DEBUG_H
+#endif //CCASH_QUORUMS_DEBUG_H

@@ -8,8 +8,8 @@
 #include <shlobj.h>
 #endif
 
-#include "fs.h"
+#include <boost/filesystem.hpp>
 
-fs::path GetTempPath() {
-    return fs::temp_directory_path();
+boost::filesystem::path GetTempPath() {
+    return boost::filesystem::temp_directory_path();
 }

@@ -1,19 +1,20 @@
 // Copyright (c) 2014-2019 The Dash Core developers
+// Copyright (c) 2019 The ColonyCash Core developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "masternode/activemasternode.h"
+#include "activemasternode.h"
 #include "base58.h"
 #include "clientversion.h"
 #include "init.h"
 #include "netbase.h"
 #include "validation.h"
-#include "masternode/masternode-payments.h"
-#include "masternode/masternode-sync.h"
+#include "masternode-payments.h"
+#include "masternode-sync.h"
 #ifdef ENABLE_WALLET
-#include "privatesend/privatesend-client.h"
+#include "privatesend-client.h"
 #endif // ENABLE_WALLET
-#include "privatesend/privatesend-server.h"
+#include "privatesend-server.h"
 #include "rpc/server.h"
 #include "util.h"
 #include "utilmoneystr.h"
@@ -51,20 +52,6 @@ UniValue privatesend(const JSONRPCRequest& request)
     if (fMasternodeMode)
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Client-side mixing is not supported on masternodes");
 
-    if (!privateSendClient.fEnablePrivateSend) {
-        if (fLiteMode) {
-            // mixing is disabled by default in lite mode
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Mixing is disabled in lite mode, use -enableprivatesend command line option to enable mixing again");
-        } else if (!gArgs.GetBoolArg("-enableprivatesend", true)) {
-            // otherwise it's on by default, unless cmd line option says otherwise
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Mixing is disabled via -enableprivatesend=0 command line option, remove it to enable mixing again");
-        } else {
-            // neither litemode nor enableprivatesend=false casee,
-            // most likely smth bad happened and we disabled it while running the wallet
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Mixing is disabled due to some internal error");
-        }
-    }
-
     if (request.params[0].get_str() == "start") {
         {
             LOCK(pwallet->cs_wallet);
@@ -72,13 +59,13 @@ UniValue privatesend(const JSONRPCRequest& request)
                 throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Error: Please unlock wallet for mixing with walletpassphrase first.");
         }
 
-        privateSendClient.fPrivateSendRunning = true;
+        privateSendClient.fEnablePrivateSend = true;
         bool result = privateSendClient.DoAutomaticDenominating(*g_connman);
         return "Mixing " + (result ? "started successfully" : ("start failed: " + privateSendClient.GetStatuses() + ", will retry"));
     }
 
     if (request.params[0].get_str() == "stop") {
-        privateSendClient.fPrivateSendRunning = false;
+        privateSendClient.fEnablePrivateSend = false;
         return "Mixing was stopped";
     }
 
@@ -139,8 +126,8 @@ UniValue getpoolinfo(const JSONRPCRequest& request)
 void masternode_list_help()
 {
     throw std::runtime_error(
-            "masternodelist ( \"mode\" \"filter\" )\n"
-            "Get a list of masternodes in different modes. This call is identical to 'masternode list' call.\n"
+            "masternode list ( \"mode\" \"filter\" )\n"
+            "Get a list of masternodes in different modes. This call is identical to masternodelist call.\n"
             "\nArguments:\n"
             "1. \"mode\"      (string, optional/required to use filter, defaults = json) The mode to run list in\n"
             "2. \"filter\"    (string, optional) Filter results. Partial match by outpoint by default in all modes,\n"
@@ -154,13 +141,13 @@ void masternode_list_help()
             "  json           - Print info in JSON format (can be additionally filtered, partial match)\n"
             "  lastpaidblock  - Print the last block height a node was paid on the network\n"
             "  lastpaidtime   - Print the last time a node was paid on the network\n"
-            "  owneraddress   - Print the masternode owner Dash address\n"
-            "  payee          - Print the masternode payout Dash address (can be additionally filtered,\n"
+            "  owneraddress   - Print the masternode owner ColonyCash address\n"
+            "  payee          - Print the masternode payout ColonyCash address (can be additionally filtered,\n"
             "                   partial match)\n"
             "  pubKeyOperator - Print the masternode operator public key\n"
             "  status         - Print masternode status: ENABLED / POSE_BANNED\n"
             "                   (can be additionally filtered, partial match)\n"
-            "  votingaddress  - Print the masternode voting Dash address\n"
+            "  votingaddress  - Print the masternode voting ColonyCash address\n"
         );
 }
 
@@ -334,7 +321,7 @@ UniValue masternode_outputs(const JSONRPCRequest& request)
 
     // Find possible candidates
     std::vector<COutput> vPossibleCoins;
-    pwallet->AvailableCoins(vPossibleCoins, true, NULL, 1, MAX_MONEY, MAX_MONEY, 0, 0, 9999999, ONLY_1000);
+    pwallet->AvailableCoins(vPossibleCoins, true, NULL, false, ONLY_1000);
 
     UniValue obj(UniValue::VOBJ);
     for (const auto& out : vPossibleCoins) {
@@ -434,7 +421,7 @@ UniValue masternode_winners(const JSONRPCRequest& request)
 [[ noreturn ]] void masternode_help()
 {
     throw std::runtime_error(
-        "masternode \"command\" ...\n"
+        "masternode \"command\"...\n"
         "Set of commands to execute masternode related actions\n"
         "\nArguments:\n"
         "1. \"command\"        (string or set of strings, required) The command to execute\n"
@@ -457,6 +444,11 @@ UniValue masternode(const JSONRPCRequest& request)
     if (request.params.size() >= 1) {
         strCommand = request.params[0].get_str();
     }
+
+#ifdef ENABLE_WALLET
+    if (strCommand == "start-many")
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "DEPRECATED, please use start-all instead");
+#endif // ENABLE_WALLET
 
     if (request.fHelp && strCommand.empty()) {
         masternode_help();
@@ -632,11 +624,11 @@ UniValue masternodelist(const JSONRPCRequest& request)
 static const CRPCCommand commands[] =
 { //  category              name                      actor (function)         okSafe argNames
   //  --------------------- ------------------------  -----------------------  ------ ----------
-    { "dash",               "masternode",             &masternode,             true,  {} },
-    { "dash",               "masternodelist",         &masternodelist,         true,  {} },
-    { "dash",               "getpoolinfo",            &getpoolinfo,            true,  {} },
+    { "colonycash",               "masternode",             &masternode,             true,  {} },
+    { "colonycash",               "masternodelist",         &masternodelist,         true,  {} },
+    { "colonycash",               "getpoolinfo",            &getpoolinfo,            true,  {} },
 #ifdef ENABLE_WALLET
-    { "dash",               "privatesend",            &privatesend,            false, {} },
+    { "colonycash",               "privatesend",            &privatesend,            false, {} },
 #endif // ENABLE_WALLET
 };
 

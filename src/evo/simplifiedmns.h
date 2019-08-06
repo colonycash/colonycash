@@ -1,9 +1,9 @@
-// Copyright (c) 2017-2019 The Dash Core developers
+// Copyright (c) 2017-2018 The Dash Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef DASH_SIMPLIFIEDMNS_H
-#define DASH_SIMPLIFIEDMNS_H
+#ifndef CCASH_SIMPLIFIEDMNS_H
+#define CCASH_SIMPLIFIEDMNS_H
 
 #include "bls/bls.h"
 #include "merkleblock.h"
@@ -19,7 +19,7 @@ class CDeterministicMN;
 namespace llmq
 {
     class CFinalCommitment;
-} // namespace llmq
+}
 
 class CSimplifiedMNListEntry
 {
@@ -147,4 +147,4 @@ public:
 
 bool BuildSimplifiedMNListDiff(const uint256& baseBlockHash, const uint256& blockHash, CSimplifiedMNListDiff& mnListDiffRet, std::string& errorRet);
 
-#endif //DASH_SIMPLIFIEDMNS_H
+#endif //CCASH_SIMPLIFIEDMNS_H

@@ -1,16 +1,17 @@
 // Copyright (c) 2014-2019 The Dash Core developers
+// Copyright (c) 2019 The ColonyCash Core developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "masternode/activemasternode.h"
+#include "activemasternode.h"
 #include "consensus/validation.h"
-#include "governance/governance.h"
-#include "governance/governance-vote.h"
-#include "governance/governance-classes.h"
-#include "governance/governance-validators.h"
+#include "governance.h"
+#include "governance-vote.h"
+#include "governance-classes.h"
+#include "governance-validators.h"
 #include "init.h"
 #include "validation.h"
-#include "masternode/masternode-sync.h"
+#include "masternode-sync.h"
 #include "messagesigner.h"
 #include "rpc/server.h"
 #include "util.h"
@@ -127,7 +128,7 @@ void gobject_prepare_help(CWallet* const pwallet)
                 "2. revision      (numeric, required) object revision in the system\n"
                 "3. time          (numeric, required) time this object was created\n"
                 "4. data-hex      (string, required)  data in hex string form\n"
-                "5. use-IS        (boolean, optional, default=false) Deprecated and ignored\n"
+                "5. use-IS        (boolean, optional, default=false) InstantSend lock the collateral, only requiring one chain confirmation\n"
                 "6. outputHash    (string, optional) the single output to submit the proposal fee from\n"
                 "7. outputIndex   (numeric, optional) The output index.\n"
                 );
@@ -160,14 +161,16 @@ UniValue gobject_prepare(const JSONRPCRequest& request)
     int nRevision = atoi(strRevision);
     int64_t nTime = atoi64(strTime);
     std::string strDataHex = request.params[4].get_str();
+    bool useIS = false;
+    if (request.params.size() > 5) useIS = request.params[5].getBool();
 
     // CREATE A NEW COLLATERAL TRANSACTION FOR THIS SPECIFIC OBJECT
 
     CGovernanceObject govobj(hashParent, nRevision, nTime, uint256(), strDataHex);
 
-    // This command is dangerous because it consumes 5 DASH irreversibly.
+    // This command is dangerous because it consumes 5 CCASH irreversibly.
     // If params are lost, it's very hard to bruteforce them and yet
-    // users ignore all instructions on dashcentral etc. and do not save them...
+    // users ignore all instructions on colonycashcentral etc. and do not save them...
     // Let's log them here and hope users do not mess with debug.log
     LogPrintf("gobject_prepare -- params: %s %s %s %s, data: %s, hash: %s\n",
                 request.params[1].get_str(), request.params[2].get_str(),
@@ -204,7 +207,7 @@ UniValue gobject_prepare(const JSONRPCRequest& request)
     }
 
     CWalletTx wtx;
-    if (!pwallet->GetBudgetSystemCollateralTX(wtx, govobj.GetHash(), govobj.GetMinCollateralFee(), outpoint)) {
+    if (!pwallet->GetBudgetSystemCollateralTX(wtx, govobj.GetHash(), govobj.GetMinCollateralFee(), useIS, outpoint)) {
         std::string err = "Error making collateral transaction for governance object. Please check your wallet balance and make sure your wallet is unlocked.";
         if (request.params.size() == 8) err += "Please verify your specified output is valid and is enough for the combined proposal fee and transaction fee.";
         throw JSONRPCError(RPC_INTERNAL_ERROR, err);
@@ -214,11 +217,11 @@ UniValue gobject_prepare(const JSONRPCRequest& request)
     CReserveKey reservekey(pwallet);
     // -- send the tx to the network
     CValidationState state;
-    if (!pwallet->CommitTransaction(wtx, reservekey, g_connman.get(), state)) {
+    if (!pwallet->CommitTransaction(wtx, reservekey, g_connman.get(), state, NetMsgType::TX)) {
         throw JSONRPCError(RPC_INTERNAL_ERROR, "CommitTransaction failed! Reason given: " + state.GetRejectReason());
     }
 
-    LogPrint(BCLog::GOBJECT, "gobject_prepare -- GetDataAsPlainString = %s, hash = %s, txid = %s\n",
+    LogPrint("gobject", "gobject_prepare -- GetDataAsPlainString = %s, hash = %s, txid = %s\n",
                 govobj.GetDataAsPlainString(), govobj.GetHash().ToString(), wtx.GetHash().ToString());
 
     return wtx.GetHash().ToString();
@@ -251,7 +254,7 @@ UniValue gobject_submit(const JSONRPCRequest& request)
     auto mnList = deterministicMNManager->GetListAtChainTip();
     bool fMnFound = mnList.HasValidMNByCollateral(activeMasternodeInfo.outpoint);
 
-    LogPrint(BCLog::GOBJECT, "gobject_submit -- pubKeyOperator = %s, outpoint = %s, params.size() = %lld, fMnFound = %d\n",
+    LogPrint("gobject", "gobject_submit -- pubKeyOperator = %s, outpoint = %s, params.size() = %lld, fMnFound = %d\n",
             (activeMasternodeInfo.blsPubKeyOperator ? activeMasternodeInfo.blsPubKeyOperator->ToString() : "N/A"),
             activeMasternodeInfo.outpoint.ToStringShort(), request.params.size(), fMnFound);
 
@@ -279,7 +282,7 @@ UniValue gobject_submit(const JSONRPCRequest& request)
 
     CGovernanceObject govobj(hashParent, nRevision, nTime, txidFee, strDataHex);
 
-    LogPrint(BCLog::GOBJECT, "gobject_submit -- GetDataAsPlainString = %s, hash = %s, txid = %s\n",
+    LogPrint("gobject", "gobject_submit -- GetDataAsPlainString = %s, hash = %s, txid = %s\n",
                 govobj.GetDataAsPlainString(), govobj.GetHash().ToString(), request.params[5].get_str());
 
     if (govobj.GetObjectType() == GOVERNANCE_OBJECT_PROPOSAL) {
@@ -306,10 +309,11 @@ UniValue gobject_submit(const JSONRPCRequest& request)
     std::string strHash = govobj.GetHash().ToString();
 
     std::string strError = "";
+    bool fMissingMasternode;
     bool fMissingConfirmations;
     {
         LOCK(cs_main);
-        if (!govobj.IsValidLocally(strError, fMissingConfirmations, true) && !fMissingConfirmations) {
+        if (!govobj.IsValidLocally(strError, fMissingMasternode, fMissingConfirmations, true) && !fMissingConfirmations) {
             LogPrintf("gobject(submit) -- Object submission rejected because object is not valid - hash = %s, strError = %s\n", strHash, strError);
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Governance object is not valid - " + strHash + " - " + strError);
         }
@@ -338,7 +342,7 @@ void gobject_vote_conf_help()
 {
     throw std::runtime_error(
                 "gobject vote-conf <governance-hash> <vote> <vote-outcome>\n"
-                "Vote on a governance object by masternode configured in dash.conf\n"
+                "Vote on a governance object by masternode configured in colonycash.conf\n"
                 "\nArguments:\n"
                 "1. governance-hash   (string, required) hash of the governance object\n"
                 "2. vote              (string, required) vote, possible values: [funding|valid|delete|endorsed]\n"
@@ -393,7 +397,7 @@ UniValue gobject_vote_conf(const JSONRPCRequest& request)
         nFailed++;
         statusObj.push_back(Pair("result", "failed"));
         statusObj.push_back(Pair("errorMessage", "Can't find masternode by collateral output"));
-        resultsObj.push_back(Pair("dash.conf", statusObj));
+        resultsObj.push_back(Pair("colonycash.conf", statusObj));
         returnObj.push_back(Pair("overall", strprintf("Voted successfully %d time(s) and failed %d time(s).", nSuccessful, nFailed)));
         returnObj.push_back(Pair("detail", resultsObj));
         return returnObj;
@@ -413,7 +417,7 @@ UniValue gobject_vote_conf(const JSONRPCRequest& request)
         nFailed++;
         statusObj.push_back(Pair("result", "failed"));
         statusObj.push_back(Pair("errorMessage", "Failure to sign."));
-        resultsObj.push_back(Pair("dash.conf", statusObj));
+        resultsObj.push_back(Pair("colonycash.conf", statusObj));
         returnObj.push_back(Pair("overall", strprintf("Voted successfully %d time(s) and failed %d time(s).", nSuccessful, nFailed)));
         returnObj.push_back(Pair("detail", resultsObj));
         return returnObj;
@@ -429,7 +433,7 @@ UniValue gobject_vote_conf(const JSONRPCRequest& request)
         statusObj.push_back(Pair("errorMessage", exception.GetMessage()));
     }
 
-    resultsObj.push_back(Pair("dash.conf", statusObj));
+    resultsObj.push_back(Pair("colonycash.conf", statusObj));
 
     returnObj.push_back(Pair("overall", strprintf("Voted successfully %d time(s) and failed %d time(s).", nSuccessful, nFailed)));
     returnObj.push_back(Pair("detail", resultsObj));
@@ -869,8 +873,8 @@ UniValue gobject_getcurrentvotes(const JSONRPCRequest& request)
 [[ noreturn ]] void gobject_help()
 {
     throw std::runtime_error(
-            "gobject \"command\" ...\n"
-            "Set of commands to manage governance objects.\n"
+            "gobject \"command\"...\n"
+            "Manage governance objects\n"
             "\nAvailable commands:\n"
             "  check              - Validate governance object data (proposal only)\n"
 #ifdef ENABLE_WALLET
@@ -886,7 +890,7 @@ UniValue gobject_getcurrentvotes(const JSONRPCRequest& request)
 #ifdef ENABLE_WALLET
             "  vote-alias         - Vote on a governance object by masternode proTxHash\n"
 #endif // ENABLE_WALLET
-            "  vote-conf          - Vote on a governance object by masternode configured in dash.conf\n"
+            "  vote-conf          - Vote on a governance object by masternode configured in colonycash.conf\n"
 #ifdef ENABLE_WALLET
             "  vote-many          - Vote on a governance object by all masternodes for which the voting key is in the wallet\n"
 #endif // ENABLE_WALLET
@@ -1086,11 +1090,11 @@ UniValue getsuperblockbudget(const JSONRPCRequest& request)
 static const CRPCCommand commands[] =
 { //  category              name                      actor (function)         okSafe argNames
   //  --------------------- ------------------------  -----------------------  ------ ----------
-    /* Dash features */
-    { "dash",               "getgovernanceinfo",      &getgovernanceinfo,      true,  {} },
-    { "dash",               "getsuperblockbudget",    &getsuperblockbudget,    true,  {"index"} },
-    { "dash",               "gobject",                &gobject,                true,  {} },
-    { "dash",               "voteraw",                &voteraw,                true,  {} },
+    /* ColonyCash features */
+    { "colonycash",               "getgovernanceinfo",      &getgovernanceinfo,      true,  {} },
+    { "colonycash",               "getsuperblockbudget",    &getsuperblockbudget,    true,  {"index"} },
+    { "colonycash",               "gobject",                &gobject,                true,  {} },
+    { "colonycash",               "voteraw",                &voteraw,                true,  {} },
 
 };
 

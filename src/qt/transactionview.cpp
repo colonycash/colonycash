@@ -389,10 +389,6 @@ void TransactionView::changedAmount(const QString &amount)
 
 void TransactionView::exportClicked()
 {
-    if (!model || !model->getOptionsModel()) {
-        return;
-    }
-
     // CSV is currently the only supported format
     QString filename = GUIUtil::getSaveFileName(this,
         tr("Export Transaction History"), QString(),
@@ -565,7 +561,7 @@ void TransactionView::showAddressQRCode()
 
     dialog->setModel(model);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
-    dialog->setInfo(tr("QR code"), "dash:"+strAddress, "", strAddress);
+    dialog->setInfo(tr("QR code"), "colonycash:"+strAddress, "", strAddress);
     dialog->show();
 }
 
@@ -578,7 +574,7 @@ void TransactionView::computeSum()
         return;
     QModelIndexList selection = transactionView->selectionModel()->selectedRows();
 
-    for (QModelIndex index : selection){
+    Q_FOREACH (QModelIndex index, selection){
         amount += index.data(TransactionTableModel::AmountRole).toLongLong();
     }
     QString strAmount(BitcoinUnits::formatWithUnit(nDisplayUnit, amount, true, BitcoinUnits::separatorAlways));

@@ -8,7 +8,7 @@
 #include "quorums_init.h"
 #include "quorums_utils.h"
 
-#include "masternode/activemasternode.h"
+#include "activemasternode.h"
 #include "chainparams.h"
 #include "init.h"
 #include "net_processing.h"
@@ -45,7 +45,7 @@ void CDKGPendingMessages::PushPendingMessage(NodeId from, CDataStream& vRecv)
     LOCK2(cs_main, cs);
 
     if (!seenMessages.emplace(hash).second) {
-        LogPrint(BCLog::LLMQ_DKG, "CDKGPendingMessages::%s -- already seen %s, peer=%d", __func__, from);
+        LogPrint("llmq-dkg", "CDKGPendingMessages::%s -- already seen %s, peer=%d", __func__, from);
         return;
     }
 
@@ -95,7 +95,7 @@ CDKGSessionHandler::CDKGSessionHandler(const Consensus::LLMQParams& _params, ctp
     pendingPrematureCommitments((size_t)_params.size * 2)
 {
     phaseHandlerThread = std::thread([this] {
-        RenameThread(strprintf("dash-q-phase-%d", (uint8_t)params.type).c_str());
+        RenameThread(strprintf("colonycash-q-phase-%d", (uint8_t)params.type).c_str());
         PhaseHandlerThread();
     });
 }
@@ -129,17 +129,17 @@ void CDKGSessionHandler::ProcessMessage(CNode* pfrom, const std::string& strComm
 {
     // We don't handle messages in the calling thread as deserialization/processing of these would block everything
     if (strCommand == NetMsgType::QCONTRIB) {
-        pendingContributions.PushPendingMessage(pfrom->GetId(), vRecv);
+        pendingContributions.PushPendingMessage(pfrom->id, vRecv);
     } else if (strCommand == NetMsgType::QCOMPLAINT) {
-        pendingComplaints.PushPendingMessage(pfrom->GetId(), vRecv);
+        pendingComplaints.PushPendingMessage(pfrom->id, vRecv);
     } else if (strCommand == NetMsgType::QJUSTIFICATION) {
-        pendingJustifications.PushPendingMessage(pfrom->GetId(), vRecv);
+        pendingJustifications.PushPendingMessage(pfrom->id, vRecv);
     } else if (strCommand == NetMsgType::QPCOMMITMENT) {
-        pendingPrematureCommitments.PushPendingMessage(pfrom->GetId(), vRecv);
+        pendingPrematureCommitments.PushPendingMessage(pfrom->id, vRecv);
     }
 }
 
-bool CDKGSessionHandler::InitNewQuorum(const CBlockIndex* pindexQuorum)
+bool CDKGSessionHandler::InitNewQuorum(int newQuorumHeight, const uint256& newQuorumHash)
 {
     //AssertLockHeld(cs_main);
 
@@ -147,13 +147,13 @@ bool CDKGSessionHandler::InitNewQuorum(const CBlockIndex* pindexQuorum)
 
     curSession = std::make_shared<CDKGSession>(params, blsWorker, dkgManager);
 
-    if (!deterministicMNManager->IsDIP3Enforced(pindexQuorum->nHeight)) {
+    if (!deterministicMNManager->IsDIP3Enforced(newQuorumHeight)) {
         return false;
     }
 
-    auto mns = CLLMQUtils::GetAllQuorumMembers(params.type, pindexQuorum);
+    auto mns = CLLMQUtils::GetAllQuorumMembers(params.type, newQuorumHash);
 
-    if (!curSession->Init(pindexQuorum, mns, activeMasternodeInfo.proTxHash)) {
+    if (!curSession->Init(newQuorumHeight, newQuorumHash, mns, activeMasternodeInfo.proTxHash)) {
         LogPrintf("CDKGSessionManager::%s -- quorum initialiation failed\n", __func__);
         return false;
     }
@@ -455,13 +455,7 @@ void CDKGSessionHandler::HandleDKGRound()
         curQuorumHeight = quorumHeight;
     }
 
-    const CBlockIndex* pindexQuorum;
-    {
-        LOCK(cs_main);
-        pindexQuorum = mapBlockIndex.at(curQuorumHash);
-    }
-
-    if (!InitNewQuorum(pindexQuorum)) {
+    if (!InitNewQuorum(curQuorumHeight, curQuorumHash)) {
         // should actually never happen
         WaitForNewQuorum(curQuorumHash);
         throw AbortPhaseException();
@@ -473,19 +467,19 @@ void CDKGSessionHandler::HandleDKGRound()
         return changed;
     });
 
-    if (curSession->AreWeMember() || gArgs.GetBoolArg("-watchquorums", DEFAULT_WATCH_QUORUMS)) {
+    if (curSession->AreWeMember() || GetBoolArg("-watchquorums", DEFAULT_WATCH_QUORUMS)) {
         std::set<uint256> connections;
         if (curSession->AreWeMember()) {
-            connections = CLLMQUtils::GetQuorumConnections(params.type, pindexQuorum, curSession->myProTxHash);
+            connections = CLLMQUtils::GetQuorumConnections(params.type, curQuorumHash, curSession->myProTxHash);
         } else {
-            auto cindexes = CLLMQUtils::CalcDeterministicWatchConnections(params.type, pindexQuorum, curSession->members.size(), 1);
+            auto cindexes = CLLMQUtils::CalcDeterministicWatchConnections(params.type, curQuorumHash, curSession->members.size(), 1);
             for (auto idx : cindexes) {
                 connections.emplace(curSession->members[idx]->dmn->proTxHash);
             }
         }
         if (!connections.empty()) {
-            if (LogAcceptCategory(BCLog::LLMQ_DKG)) {
-                std::string debugMsg = strprintf("CDKGSessionManager::%s -- adding masternodes quorum connections for quorum %s:\n", __func__, curSession->pindexQuorum->GetBlockHash().ToString());
+            if (LogAcceptCategory("llmq-dkg")) {
+                std::string debugMsg = strprintf("CDKGSessionManager::%s -- adding masternodes quorum connections for quorum %s:\n", __func__, curSession->quorumHash.ToString());
                 auto mnList = deterministicMNManager->GetListAtChainTip();
                 for (const auto& c : connections) {
                     auto dmn = mnList.GetValidMN(c);
@@ -495,7 +489,7 @@ void CDKGSessionHandler::HandleDKGRound()
                         debugMsg += strprintf("  %s (%s)\n", c.ToString(), dmn->pdmnState->addr.ToString(false));
                     }
                 }
-                LogPrint(BCLog::LLMQ_DKG, debugMsg.c_str());
+                LogPrint("llmq-dkg", debugMsg);
             }
             g_connman->AddMasternodeQuorumNodes(params.type, curQuorumHash, connections);
         }
@@ -555,9 +549,9 @@ void CDKGSessionHandler::PhaseHandlerThread()
                 status.aborted = true;
                 return true;
             });
-            LogPrint(BCLog::LLMQ_DKG, "CDKGSessionHandler::%s -- aborted current DKG session for llmq=%s\n", __func__, params.name);
+            LogPrint("llmq-dkg", "CDKGSessionHandler::%s -- aborted current DKG session for llmq=%s\n", __func__, params.name);
         }
     }
 }
 
-} // namespace llmq
+}

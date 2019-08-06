@@ -27,7 +27,7 @@ static bool CheckService(const uint256& proTxHash, const ProTx& proTx, CValidati
         return state.DoS(10, false, REJECT_INVALID, "bad-protx-addr");
     }
 
-    static int mainnetDefaultPort = CreateChainParams(CBaseChainParams::MAIN)->GetDefaultPort();
+    int mainnetDefaultPort = Params(CBaseChainParams::MAIN).GetDefaultPort();
     if (Params().NetworkIDString() == CBaseChainParams::MAIN) {
         if (proTx.addr.GetPort() != mainnetDefaultPort) {
             return state.DoS(10, false, REJECT_INVALID, "bad-protx-addr-port");
@@ -174,7 +174,7 @@ bool CheckProRegTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CValid
     }
 
     if (pindexPrev) {
-        auto mnList = deterministicMNManager->GetListForBlock(pindexPrev);
+        auto mnList = deterministicMNManager->GetListForBlock(pindexPrev->GetBlockHash());
 
         // only allow reusing of addresses when it's for the same collateral (which replaces the old MN)
         if (mnList.HasUniqueProperty(ptx.addr) && mnList.GetUniquePropertyMN(ptx.addr)->collateralOutpoint != collateralOutpoint) {
@@ -232,7 +232,7 @@ bool CheckProUpServTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CVa
     }
 
     if (pindexPrev) {
-        auto mnList = deterministicMNManager->GetListForBlock(pindexPrev);
+        auto mnList = deterministicMNManager->GetListForBlock(pindexPrev->GetBlockHash());
         auto mn = mnList.GetMN(ptx.proTxHash);
         if (!mn) {
             return state.DoS(100, false, REJECT_INVALID, "bad-protx-hash");
@@ -297,7 +297,7 @@ bool CheckProUpRegTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CVal
     }
 
     if (pindexPrev) {
-        auto mnList = deterministicMNManager->GetListForBlock(pindexPrev);
+        auto mnList = deterministicMNManager->GetListForBlock(pindexPrev->GetBlockHash());
         auto dmn = mnList.GetMN(ptx.proTxHash);
         if (!dmn) {
             return state.DoS(100, false, REJECT_INVALID, "bad-protx-hash");
@@ -369,7 +369,7 @@ bool CheckProUpRevTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CVal
     }
 
     if (pindexPrev) {
-        auto mnList = deterministicMNManager->GetListForBlock(pindexPrev);
+        auto mnList = deterministicMNManager->GetListForBlock(pindexPrev->GetBlockHash());
         auto dmn = mnList.GetMN(ptx.proTxHash);
         if (!dmn)
             return state.DoS(100, false, REJECT_INVALID, "bad-protx-hash");
@@ -421,6 +421,28 @@ std::string CProRegTx::ToString() const
         nVersion, collateralOutpoint.ToStringShort(), addr.ToString(), (double)nOperatorReward / 100, CBitcoinAddress(keyIDOwner).ToString(), pubKeyOperator.ToString(), CBitcoinAddress(keyIDVoting).ToString(), payee);
 }
 
+void CProRegTx::ToJson(UniValue& obj) const
+{
+    obj.clear();
+    obj.setObject();
+    obj.push_back(Pair("version", nVersion));
+    obj.push_back(Pair("collateralHash", collateralOutpoint.hash.ToString()));
+    obj.push_back(Pair("collateralIndex", (int)collateralOutpoint.n));
+    obj.push_back(Pair("service", addr.ToString(false)));
+    obj.push_back(Pair("ownerAddress", CBitcoinAddress(keyIDOwner).ToString()));
+    obj.push_back(Pair("votingAddress", CBitcoinAddress(keyIDVoting).ToString()));
+
+    CTxDestination dest;
+    if (ExtractDestination(scriptPayout, dest)) {
+        CBitcoinAddress bitcoinAddress(dest);
+        obj.push_back(Pair("payoutAddress", bitcoinAddress.ToString()));
+    }
+    obj.push_back(Pair("pubKeyOperator", pubKeyOperator.ToString()));
+    obj.push_back(Pair("operatorReward", (double)nOperatorReward / 100));
+
+    obj.push_back(Pair("inputsHash", inputsHash.ToString()));
+}
+
 std::string CProUpServTx::ToString() const
 {
     CTxDestination dest;
@@ -431,6 +453,21 @@ std::string CProUpServTx::ToString() const
 
     return strprintf("CProUpServTx(nVersion=%d, proTxHash=%s, addr=%s, operatorPayoutAddress=%s)",
         nVersion, proTxHash.ToString(), addr.ToString(), payee);
+}
+
+void CProUpServTx::ToJson(UniValue& obj) const
+{
+    obj.clear();
+    obj.setObject();
+    obj.push_back(Pair("version", nVersion));
+    obj.push_back(Pair("proTxHash", proTxHash.ToString()));
+    obj.push_back(Pair("service", addr.ToString(false)));
+    CTxDestination dest;
+    if (ExtractDestination(scriptOperatorPayout, dest)) {
+        CBitcoinAddress bitcoinAddress(dest);
+        obj.push_back(Pair("operatorPayoutAddress", bitcoinAddress.ToString()));
+    }
+    obj.push_back(Pair("inputsHash", inputsHash.ToString()));
 }
 
 std::string CProUpRegTx::ToString() const
@@ -445,8 +482,34 @@ std::string CProUpRegTx::ToString() const
         nVersion, proTxHash.ToString(), pubKeyOperator.ToString(), CBitcoinAddress(keyIDVoting).ToString(), payee);
 }
 
+void CProUpRegTx::ToJson(UniValue& obj) const
+{
+    obj.clear();
+    obj.setObject();
+    obj.push_back(Pair("version", nVersion));
+    obj.push_back(Pair("proTxHash", proTxHash.ToString()));
+    obj.push_back(Pair("votingAddress", CBitcoinAddress(keyIDVoting).ToString()));
+    CTxDestination dest;
+    if (ExtractDestination(scriptPayout, dest)) {
+        CBitcoinAddress bitcoinAddress(dest);
+        obj.push_back(Pair("payoutAddress", bitcoinAddress.ToString()));
+    }
+    obj.push_back(Pair("pubKeyOperator", pubKeyOperator.ToString()));
+    obj.push_back(Pair("inputsHash", inputsHash.ToString()));
+}
+
 std::string CProUpRevTx::ToString() const
 {
     return strprintf("CProUpRevTx(nVersion=%d, proTxHash=%s, nReason=%d)",
         nVersion, proTxHash.ToString(), nReason);
+}
+
+void CProUpRevTx::ToJson(UniValue& obj) const
+{
+    obj.clear();
+    obj.setObject();
+    obj.push_back(Pair("version", nVersion));
+    obj.push_back(Pair("proTxHash", proTxHash.ToString()));
+    obj.push_back(Pair("reason", (int)nReason));
+    obj.push_back(Pair("inputsHash", inputsHash.ToString()));
 }

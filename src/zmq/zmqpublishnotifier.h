@@ -39,7 +39,7 @@ public:
 class CZMQPublishHashChainLockNotifier : public CZMQAbstractPublishNotifier
 {
 public:
-    bool NotifyChainLock(const CBlockIndex *pindex, const llmq::CChainLockSig& clsig) override;
+    bool NotifyChainLock(const CBlockIndex *pindex) override;
 };
 
 class CZMQPublishHashTransactionNotifier : public CZMQAbstractPublishNotifier
@@ -51,7 +51,7 @@ public:
 class CZMQPublishHashTransactionLockNotifier : public CZMQAbstractPublishNotifier
 {
 public:
-    bool NotifyTransactionLock(const CTransaction &transaction, const llmq::CInstantSendLock& islock) override;
+    bool NotifyTransactionLock(const CTransaction &transaction) override;
 };
 
 class CZMQPublishHashGovernanceVoteNotifier : public CZMQAbstractPublishNotifier
@@ -81,13 +81,7 @@ public:
 class CZMQPublishRawChainLockNotifier : public CZMQAbstractPublishNotifier
 {
 public:
-    bool NotifyChainLock(const CBlockIndex *pindex, const llmq::CChainLockSig& clsig) override;
-};
-
-class CZMQPublishRawChainLockSigNotifier : public CZMQAbstractPublishNotifier
-{
-public:
-    bool NotifyChainLock(const CBlockIndex *pindex, const llmq::CChainLockSig& clsig) override;
+    bool NotifyChainLock(const CBlockIndex *pindex) override;
 };
 
 class CZMQPublishRawTransactionNotifier : public CZMQAbstractPublishNotifier
@@ -99,13 +93,7 @@ public:
 class CZMQPublishRawTransactionLockNotifier : public CZMQAbstractPublishNotifier
 {
 public:
-    bool NotifyTransactionLock(const CTransaction &transaction, const llmq::CInstantSendLock& islock) override;
-};
-
-class CZMQPublishRawTransactionLockSigNotifier : public CZMQAbstractPublishNotifier
-{
-public:
-    bool NotifyTransactionLock(const CTransaction &transaction, const llmq::CInstantSendLock& islock) override;
+    bool NotifyTransactionLock(const CTransaction &transaction) override;
 };
 
 class CZMQPublishRawGovernanceVoteNotifier : public CZMQAbstractPublishNotifier

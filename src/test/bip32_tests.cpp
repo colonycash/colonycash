@@ -9,7 +9,7 @@
 #include "uint256.h"
 #include "util.h"
 #include "utilstrencodings.h"
-#include "test/test_dash.h"
+#include "test/test_colonycash.h"
 
 #include <string>
 #include <vector>
@@ -93,7 +93,7 @@ void RunTest(const TestVector &test) {
     CExtPubKey pubkey;
     key.SetMaster(&seed[0], seed.size());
     pubkey = key.Neuter();
-    for (const TestDerivation &derive : test.vDerive) {
+    BOOST_FOREACH(const TestDerivation &derive, test.vDerive) {
         unsigned char data[74];
         key.Encode(data);
         pubkey.Encode(data);

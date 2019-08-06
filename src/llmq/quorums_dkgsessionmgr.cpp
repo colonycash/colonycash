@@ -40,7 +40,7 @@ void CDKGSessionManager::StartMessageHandlerPool()
     }
 
     messageHandlerPool.resize(2);
-    RenameThreadPool(messageHandlerPool, "dash-q-msg");
+    RenameThreadPool(messageHandlerPool, "colonycash-q-msg");
 }
 
 void CDKGSessionManager::StopMessageHandlerPool()
@@ -86,7 +86,7 @@ void CDKGSessionManager::ProcessMessage(CNode* pfrom, const std::string& strComm
 
     if (vRecv.size() < 1) {
         LOCK(cs_main);
-        Misbehaving(pfrom->GetId(), 100);
+        Misbehaving(pfrom->id, 100);
         return;
     }
 
@@ -94,7 +94,7 @@ void CDKGSessionManager::ProcessMessage(CNode* pfrom, const std::string& strComm
     Consensus::LLMQType llmqType = (Consensus::LLMQType)*vRecv.begin();
     if (!dkgSessionHandlers.count(llmqType)) {
         LOCK(cs_main);
-        Misbehaving(pfrom->GetId(), 100);
+        Misbehaving(pfrom->id, 100);
         return;
     }
 
@@ -198,19 +198,19 @@ bool CDKGSessionManager::GetPrematureCommitment(const uint256& hash, CDKGPrematu
     return false;
 }
 
-void CDKGSessionManager::WriteVerifiedVvecContribution(Consensus::LLMQType llmqType, const CBlockIndex* pindexQuorum, const uint256& proTxHash, const BLSVerificationVectorPtr& vvec)
+void CDKGSessionManager::WriteVerifiedVvecContribution(Consensus::LLMQType llmqType, const uint256& quorumHash, const uint256& proTxHash, const BLSVerificationVectorPtr& vvec)
 {
-    llmqDb.Write(std::make_tuple(DB_VVEC, llmqType, pindexQuorum->GetBlockHash(), proTxHash), *vvec);
+    llmqDb.Write(std::make_tuple(DB_VVEC, (uint8_t)llmqType, quorumHash, proTxHash), *vvec);
 }
 
-void CDKGSessionManager::WriteVerifiedSkContribution(Consensus::LLMQType llmqType, const CBlockIndex* pindexQuorum, const uint256& proTxHash, const CBLSSecretKey& skContribution)
+void CDKGSessionManager::WriteVerifiedSkContribution(Consensus::LLMQType llmqType, const uint256& quorumHash, const uint256& proTxHash, const CBLSSecretKey& skContribution)
 {
-    llmqDb.Write(std::make_tuple(DB_SKCONTRIB, llmqType, pindexQuorum->GetBlockHash(), proTxHash), skContribution);
+    llmqDb.Write(std::make_tuple(DB_SKCONTRIB, (uint8_t)llmqType, quorumHash, proTxHash), skContribution);
 }
 
-bool CDKGSessionManager::GetVerifiedContributions(Consensus::LLMQType llmqType, const CBlockIndex* pindexQuorum, const std::vector<bool>& validMembers, std::vector<uint16_t>& memberIndexesRet, std::vector<BLSVerificationVectorPtr>& vvecsRet, BLSSecretKeyVector& skContributionsRet)
+bool CDKGSessionManager::GetVerifiedContributions(Consensus::LLMQType llmqType, const uint256& quorumHash, const std::vector<bool>& validMembers, std::vector<uint16_t>& memberIndexesRet, std::vector<BLSVerificationVectorPtr>& vvecsRet, BLSSecretKeyVector& skContributionsRet)
 {
-    auto members = CLLMQUtils::GetAllQuorumMembers(llmqType, pindexQuorum);
+    auto members = CLLMQUtils::GetAllQuorumMembers(llmqType, quorumHash);
 
     memberIndexesRet.clear();
     vvecsRet.clear();
@@ -222,7 +222,7 @@ bool CDKGSessionManager::GetVerifiedContributions(Consensus::LLMQType llmqType, 
         if (validMembers[i]) {
             BLSVerificationVectorPtr vvec;
             CBLSSecretKey skContribution;
-            if (!GetVerifiedContribution(llmqType, pindexQuorum, members[i]->proTxHash, vvec, skContribution)) {
+            if (!GetVerifiedContribution(llmqType, quorumHash, members[i]->proTxHash, vvec, skContribution)) {
                 return false;
             }
 
@@ -234,10 +234,10 @@ bool CDKGSessionManager::GetVerifiedContributions(Consensus::LLMQType llmqType, 
     return true;
 }
 
-bool CDKGSessionManager::GetVerifiedContribution(Consensus::LLMQType llmqType, const CBlockIndex* pindexQuorum, const uint256& proTxHash, BLSVerificationVectorPtr& vvecRet, CBLSSecretKey& skContributionRet)
+bool CDKGSessionManager::GetVerifiedContribution(Consensus::LLMQType llmqType, const uint256& quorumHash, const uint256& proTxHash, BLSVerificationVectorPtr& vvecRet, CBLSSecretKey& skContributionRet)
 {
     LOCK(contributionsCacheCs);
-    ContributionsCacheKey cacheKey = {llmqType, pindexQuorum->GetBlockHash(), proTxHash};
+    ContributionsCacheKey cacheKey = {llmqType, quorumHash, proTxHash};
     auto it = contributionsCache.find(cacheKey);
     if (it != contributionsCache.end()) {
         vvecRet = it->second.vvec;
@@ -248,10 +248,10 @@ bool CDKGSessionManager::GetVerifiedContribution(Consensus::LLMQType llmqType, c
     BLSVerificationVector vvec;
     BLSVerificationVectorPtr vvecPtr;
     CBLSSecretKey skContribution;
-    if (llmqDb.Read(std::make_tuple(DB_VVEC, llmqType, pindexQuorum->GetBlockHash(), proTxHash), vvec)) {
+    if (llmqDb.Read(std::make_tuple(DB_VVEC, (uint8_t)llmqType, quorumHash, proTxHash), vvec)) {
         vvecPtr = std::make_shared<BLSVerificationVector>(std::move(vvec));
     }
-    llmqDb.Read(std::make_tuple(DB_SKCONTRIB, llmqType, pindexQuorum->GetBlockHash(), proTxHash), skContribution);
+    llmqDb.Read(std::make_tuple(DB_SKCONTRIB, (uint8_t)llmqType, quorumHash, proTxHash), skContribution);
 
     it = contributionsCache.emplace(cacheKey, ContributionsCacheEntry{GetTimeMillis(), vvecPtr, skContribution}).first;
 
@@ -274,4 +274,4 @@ void CDKGSessionManager::CleanupCache()
     }
 }
 
-} // namespace llmq
+}

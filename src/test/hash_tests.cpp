@@ -4,7 +4,7 @@
 
 #include "hash.h"
 #include "utilstrencodings.h"
-#include "test/test_dash.h"
+#include "test/test_colonycash.h"
 
 #include <vector>
 
@@ -134,7 +134,7 @@ BOOST_AUTO_TEST_CASE(siphash)
     for (int i = 0; i < 16; ++i) {
         uint64_t k1 = ctx.rand64();
         uint64_t k2 = ctx.rand64();
-        uint256 x = InsecureRand256();
+        uint256 x = GetRandHash();
         uint32_t n = ctx.rand32();
         uint8_t nb[4];
         WriteLE32(nb, n);

@@ -5,7 +5,6 @@
 #ifndef BITCOIN_WALLET_COINCONTROL_H
 #define BITCOIN_WALLET_COINCONTROL_H
 
-#include "policy/feerate.h"
 #include "primitives/transaction.h"
 
 /** Coin Control Features. */
@@ -14,12 +13,15 @@ class CCoinControl
 public:
     CTxDestination destChange;
     bool fUsePrivateSend;
+    bool fUseInstantSend;
     //! If false, allows unselected inputs, but requires all selected inputs be used if fAllowOtherInputs is true (default)
     bool fAllowOtherInputs;
     //! If false, only include as many inputs as necessary to fulfill a coin selection request. Only usable together with fAllowOtherInputs
     bool fRequireAllInputs;
     //! Includes watch only addresses which match the ISMINE_WATCH_SOLVABLE criteria
     bool fAllowWatchOnly;
+    //! Minimum absolute fee (not per kilobyte)
+    CAmount nMinimumTotalFee;
     //! Override estimated feerate
     bool fOverrideFeeRate;
     //! Feerate to use if overrideFeeRate is true
@@ -39,7 +41,9 @@ public:
         fRequireAllInputs = true;
         fAllowWatchOnly = false;
         setSelected.clear();
+        fUseInstantSend = false;
         fUsePrivateSend = true;
+        nMinimumTotalFee = 0;
         nFeeRate = CFeeRate(0);
         fOverrideFeeRate = false;
         nConfirmTarget = 0;

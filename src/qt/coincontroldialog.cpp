@@ -1,5 +1,5 @@
 // Copyright (c) 2011-2015 The Bitcoin Core developers
-// Copyright (c) 2014-2019 The Dash Core developers
+// Copyright (c) 2014-2018 The Dash Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -16,12 +16,14 @@
 
 #include "wallet/coincontrol.h"
 #include "init.h"
-#include "policy/fees.h"
 #include "policy/policy.h"
 #include "validation.h" // For mempool
 #include "wallet/wallet.h"
 
-#include "privatesend/privatesend-client.h"
+#include "instantx.h"
+#include "privatesend-client.h"
+
+#include <boost/assign/list_of.hpp> // for 'map_list_of()'
 
 #include <QApplication>
 #include <QCheckBox>
@@ -431,7 +433,7 @@ void CoinControlDialog::viewItemChanged(QTreeWidgetItem* item, int column)
             item->setCheckState(COLUMN_CHECKBOX, Qt::Unchecked);
         else {
             coinControl->Select(outpt);
-            int nRounds = vpwallets[0]->GetRealOutpointPrivateSendRounds(outpt);
+            int nRounds = pwalletMain->GetRealOutpointPrivateSendRounds(outpt);
             if (coinControl->fUsePrivateSend && nRounds < privateSendClient.nPrivateSendRounds) {
                 QMessageBox::warning(this, windowTitle(),
                     tr("Non-anonymized input selected. <b>PrivateSend will be disabled.</b><br><br>If you still want to use PrivateSend, please deselect all non-anonymized inputs first and then check the PrivateSend checkbox again."),
@@ -478,7 +480,7 @@ void CoinControlDialog::updateLabels(WalletModel *model, QDialog* dialog)
     CAmount nPayAmount = 0;
     bool fDust = false;
     CMutableTransaction txDummy;
-    for (const CAmount &amount : CoinControlDialog::payAmounts)
+    Q_FOREACH(const CAmount &amount, CoinControlDialog::payAmounts)
     {
         nPayAmount += amount;
 
@@ -486,7 +488,8 @@ void CoinControlDialog::updateLabels(WalletModel *model, QDialog* dialog)
         {
             CTxOut txout(amount, (CScript)std::vector<unsigned char>(24, 0));
             txDummy.vout.push_back(txout);
-            fDust |= IsDust(txout, ::dustRelayFee);
+            if (txout.IsDust(dustRelayFee))
+               fDust = true;
         }
     }
 
@@ -504,7 +507,7 @@ void CoinControlDialog::updateLabels(WalletModel *model, QDialog* dialog)
     coinControl->ListSelected(vCoinControl);
     model->getOutputs(vCoinControl, vOutputs);
 
-    for (const COutput& out : vOutputs) {
+    BOOST_FOREACH(const COutput& out, vOutputs) {
         // unselect already spent, very unlikely scenario, this could happen
         // when selected are spent elsewhere, like rpc or another computer
         uint256 txhash = out.tx->GetHash();
@@ -535,6 +538,10 @@ void CoinControlDialog::updateLabels(WalletModel *model, QDialog* dialog)
                 nBytesInputs += 148; // in all error cases, simply assume 148 here
         }
         else nBytesInputs += 148;
+
+        // Add inputs to calculate InstantSend Fee later
+        if(coinControl->fUseInstantSend)
+            txDummy.vin.push_back(CTxIn());
     }
 
     // calculation
@@ -549,7 +556,12 @@ void CoinControlDialog::updateLabels(WalletModel *model, QDialog* dialog)
                 nBytes -= 34;
 
         // Fee
-        nPayFee = CWallet::GetMinimumFee(nBytes, coinControl->nConfirmTarget, ::mempool, ::feeEstimator);
+        nPayFee = CWallet::GetMinimumFee(nBytes, nTxConfirmTarget, mempool);
+        if (nPayFee > 0 && coinControl->nMinimumTotalFee > nPayFee)
+            nPayFee = coinControl->nMinimumTotalFee;
+
+        // InstantSend Fee
+        if (coinControl->fUseInstantSend) nPayFee = std::max(nPayFee, CTxLockRequest(txDummy).GetMinFee(true));
 
         if (nPayAmount > 0)
         {
@@ -567,12 +579,15 @@ void CoinControlDialog::updateLabels(WalletModel *model, QDialog* dialog)
             if (nChange > 0 && nChange < MIN_CHANGE)
             {
                 CTxOut txout(nChange, (CScript)std::vector<unsigned char>(24, 0));
-                if (IsDust(txout, ::dustRelayFee))
+                if (txout.IsDust(dustRelayFee))
                 {
-                    nPayFee += nChange;
-                    nChange = 0;
-                    if (CoinControlDialog::fSubtractFeeFromAmount)
-                        nBytes -= 34; // we didn't detect lack of change above
+                    if (CoinControlDialog::fSubtractFeeFromAmount) // dust-change will be raised until no dust
+                        nChange = txout.GetDustThreshold(dustRelayFee);
+                    else
+                    {
+                        nPayFee += nChange;
+                        nChange = 0;
+                    }
                 }
             }
 
@@ -585,7 +600,7 @@ void CoinControlDialog::updateLabels(WalletModel *model, QDialog* dialog)
     }
 
     // actually update labels
-    int nDisplayUnit = BitcoinUnits::DASH;
+    int nDisplayUnit = BitcoinUnits::CCASH;
     if (model && model->getOptionsModel())
         nDisplayUnit = model->getOptionsModel()->getDisplayUnit();
 
@@ -611,7 +626,7 @@ void CoinControlDialog::updateLabels(WalletModel *model, QDialog* dialog)
     l5->setText(((nBytes > 0) ? ASYMP_UTF8 : "") + QString::number(nBytes));        // Bytes
     l7->setText(fDust ? tr("yes") : tr("no"));                               // Dust
     l8->setText(BitcoinUnits::formatWithUnit(nDisplayUnit, nChange));        // Change
-    if (nPayFee > 0)
+    if (nPayFee > 0 && (coinControl->nMinimumTotalFee < nPayFee))
     {
         l3->setText(ASYMP_UTF8 + l3->text());
         l4->setText(ASYMP_UTF8 + l4->text());
@@ -630,7 +645,7 @@ void CoinControlDialog::updateLabels(WalletModel *model, QDialog* dialog)
     if (payTxFee.GetFeePerK() > 0)
         dFeeVary = (double)std::max(CWallet::GetRequiredFee(1000), payTxFee.GetFeePerK()) / 1000;
     else {
-        dFeeVary = (double)std::max(CWallet::GetRequiredFee(1000), ::feeEstimator.estimateSmartFee(coinControl->nConfirmTarget, NULL, ::mempool).GetFeePerK()) / 1000;
+        dFeeVary = (double)std::max(CWallet::GetRequiredFee(1000), mempool.estimateSmartFee(nTxConfirmTarget).GetFeePerK()) / 1000;
     }
     QString toolTip4 = tr("Can vary +/- %1 duff(s) per input.").arg(dFeeVary);
 
@@ -669,7 +684,7 @@ void CoinControlDialog::updateView()
     std::map<QString, std::vector<COutput> > mapCoins;
     model->listCoins(mapCoins);
 
-    for (const std::pair<QString, std::vector<COutput>>& coins : mapCoins) {
+    BOOST_FOREACH(const PAIRTYPE(QString, std::vector<COutput>)& coins, mapCoins) {
         CCoinControlWidgetItem *itemWalletAddress = new CCoinControlWidgetItem();
         itemWalletAddress->setCheckState(COLUMN_CHECKBOX, Qt::Unchecked);
         QString sWalletAddress = coins.first;
@@ -696,7 +711,7 @@ void CoinControlDialog::updateView()
 
         CAmount nSum = 0;
         int nChildren = 0;
-        for (const COutput& out : coins.second) {
+        BOOST_FOREACH(const COutput& out, coins.second) {
             nSum += out.tx->tx->vout[out.i].nValue;
             nChildren++;
 
@@ -713,7 +728,7 @@ void CoinControlDialog::updateView()
             {
                 sAddress = QString::fromStdString(CBitcoinAddress(outputAddress).ToString());
 
-                // if listMode or change => show dash address. In tree mode, address is not shown again for direct wallet address outputs
+                // if listMode or change => show colonycash address. In tree mode, address is not shown again for direct wallet address outputs
                 if (!treeMode || (!(sAddress == sWalletAddress)))
                     itemOutput->setText(COLUMN_ADDRESS, sAddress);
 
@@ -748,9 +763,9 @@ void CoinControlDialog::updateView()
 
             // PrivateSend rounds
             COutPoint outpoint = COutPoint(out.tx->tx->GetHash(), out.i);
-            int nRounds = vpwallets[0]->GetRealOutpointPrivateSendRounds(outpoint);
+            int nRounds = pwalletMain->GetRealOutpointPrivateSendRounds(outpoint);
 
-            if (nRounds >= 0 || LogAcceptCategory(BCLog::PRIVATESEND)) itemOutput->setText(COLUMN_PRIVATESEND_ROUNDS, QString::number(nRounds));
+            if (nRounds >= 0 || fDebug) itemOutput->setText(COLUMN_PRIVATESEND_ROUNDS, QString::number(nRounds));
             else itemOutput->setText(COLUMN_PRIVATESEND_ROUNDS, tr("n/a"));
             itemOutput->setData(COLUMN_PRIVATESEND_ROUNDS, Qt::UserRole, QVariant((qlonglong)nRounds));
 

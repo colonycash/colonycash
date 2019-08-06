@@ -11,7 +11,7 @@
 
 #include "evo/specialtx.h"
 
-#include "masternode/activemasternode.h"
+#include "activemasternode.h"
 #include "chainparams.h"
 #include "init.h"
 #include "net.h"
@@ -60,12 +60,12 @@ static bool ShouldSimulateError(const std::string& type)
 }
 
 CDKGLogger::CDKGLogger(const CDKGSession& _quorumDkg, const std::string& _func) :
-    CDKGLogger(_quorumDkg.params.type, _quorumDkg.pindexQuorum->GetBlockHash(), _quorumDkg.pindexQuorum->nHeight, _quorumDkg.AreWeMember(), _func)
+    CDKGLogger(_quorumDkg.params.type, _quorumDkg.quorumHash, _quorumDkg.height, _quorumDkg.AreWeMember(), _func)
 {
 }
 
 CDKGLogger::CDKGLogger(Consensus::LLMQType _llmqType, const uint256& _quorumHash, int _height, bool _areWeMember, const std::string& _func) :
-    CBatchedLogger(BCLog::LLMQ_DKG, strprintf("QuorumDKG(type=%d, height=%d, member=%d, func=%s)", _llmqType, _height, _areWeMember, _func))
+    CBatchedLogger("llmq-dkg", strprintf("QuorumDKG(type=%d, height=%d, member=%d, func=%s)", _llmqType, _height, _areWeMember, _func))
 {
 }
 
@@ -88,13 +88,14 @@ CDKGMember::CDKGMember(CDeterministicMNCPtr _dmn, size_t _idx) :
 
 }
 
-bool CDKGSession::Init(const CBlockIndex* _pindexQuorum, const std::vector<CDeterministicMNCPtr>& mns, const uint256& _myProTxHash)
+bool CDKGSession::Init(int _height, const uint256& _quorumHash, const std::vector<CDeterministicMNCPtr>& mns, const uint256& _myProTxHash)
 {
     if (mns.size() < params.minSize) {
         return false;
     }
 
-    pindexQuorum = _pindexQuorum;
+    height = _height;
+    quorumHash = _quorumHash;
 
     members.resize(mns.size());
     memberIds.resize(members.size());
@@ -120,7 +121,7 @@ bool CDKGSession::Init(const CBlockIndex* _pindexQuorum, const std::vector<CDete
     }
 
     if (!myProTxHash.IsNull()) {
-        quorumDKGDebugManager->InitLocalSessionStatus(params.type, pindexQuorum->GetBlockHash(), pindexQuorum->nHeight);
+        quorumDKGDebugManager->InitLocalSessionStatus(params.type, quorumHash, height);
     }
 
     CDKGLogger logger(*this, __func__);
@@ -168,8 +169,8 @@ void CDKGSession::SendContributions(CDKGPendingMessages& pendingMessages)
     }
 
     CDKGContribution qc;
-    qc.llmqType = params.type;
-    qc.quorumHash = pindexQuorum->GetBlockHash();
+    qc.llmqType = (uint8_t)params.type;
+    qc.quorumHash = quorumHash;
     qc.proTxHash = myProTxHash;
     qc.vvec = vvecContribution;
 
@@ -215,7 +216,7 @@ bool CDKGSession::PreVerifyMessage(const uint256& hash, const CDKGContribution& 
 
     retBan = false;
 
-    if (qc.quorumHash != pindexQuorum->GetBlockHash()) {
+    if (qc.quorumHash != quorumHash) {
         logger.Batch("contribution for wrong quorum, rejecting");
         return false;
     }
@@ -315,7 +316,7 @@ void CDKGSession::ReceiveMessage(const uint256& hash, const CDKGContribution& qc
         return;
     }
 
-    dkgManager.WriteVerifiedVvecContribution(params.type, pindexQuorum, qc.proTxHash, qc.vvec);
+    dkgManager.WriteVerifiedVvecContribution(params.type, qc.quorumHash, qc.proTxHash, qc.vvec);
 
     bool complain = false;
     CBLSSecretKey skContribution;
@@ -397,7 +398,7 @@ void CDKGSession::VerifyPendingContributions()
             });
         } else {
             size_t memberIdx = memberIndexes[i];
-            dkgManager.WriteVerifiedSkContribution(params.type, pindexQuorum, members[memberIdx]->dmn->proTxHash, skContributions[i]);
+            dkgManager.WriteVerifiedSkContribution(params.type, quorumHash, members[memberIdx]->dmn->proTxHash, skContributions[i]);
         }
     }
 
@@ -447,8 +448,8 @@ void CDKGSession::SendComplaint(CDKGPendingMessages& pendingMessages)
     assert(AreWeMember());
 
     CDKGComplaint qc(params);
-    qc.llmqType = params.type;
-    qc.quorumHash = pindexQuorum->GetBlockHash();
+    qc.llmqType = (uint8_t)params.type;
+    qc.quorumHash = quorumHash;
     qc.proTxHash = myProTxHash;
 
     int badCount = 0;
@@ -489,7 +490,7 @@ bool CDKGSession::PreVerifyMessage(const uint256& hash, const CDKGComplaint& qc,
 
     retBan = false;
 
-    if (qc.quorumHash != pindexQuorum->GetBlockHash()) {
+    if (qc.quorumHash != quorumHash) {
         logger.Batch("complaint for wrong quorum, rejecting");
         return false;
     }
@@ -641,8 +642,8 @@ void CDKGSession::SendJustification(CDKGPendingMessages& pendingMessages, const 
     logger.Batch("sending justification for %d members", forMembers.size());
 
     CDKGJustification qj;
-    qj.llmqType = params.type;
-    qj.quorumHash = pindexQuorum->GetBlockHash();
+    qj.llmqType = (uint8_t)params.type;
+    qj.quorumHash = quorumHash;
     qj.proTxHash = myProTxHash;
     qj.contributions.reserve(forMembers.size());
 
@@ -687,7 +688,7 @@ bool CDKGSession::PreVerifyMessage(const uint256& hash, const CDKGJustification&
 
     retBan = false;
 
-    if (qj.quorumHash != pindexQuorum->GetBlockHash()) {
+    if (qj.quorumHash != quorumHash) {
         logger.Batch("justification for wrong quorum, rejecting");
         return false;
     }
@@ -823,7 +824,7 @@ void CDKGSession::ReceiveMessage(const uint256& hash, const CDKGJustification& q
                 receivedSkContributions[member->idx] = skContribution;
                 member->weComplain = false;
 
-                dkgManager.WriteVerifiedSkContribution(params.type, pindexQuorum, member->dmn->proTxHash, skContribution);
+                dkgManager.WriteVerifiedSkContribution(params.type, quorumHash, member->dmn->proTxHash, skContribution);
             }
             member->complaintsFromOthers.erase(member2->dmn->proTxHash);
         }
@@ -897,8 +898,8 @@ void CDKGSession::SendCommitment(CDKGPendingMessages& pendingMessages)
     logger.Batch("sending commitment");
 
     CDKGPrematureCommitment qc(params);
-    qc.llmqType = params.type;
-    qc.quorumHash = pindexQuorum->GetBlockHash();
+    qc.llmqType = (uint8_t)params.type;
+    qc.quorumHash = quorumHash;
     qc.proTxHash = myProTxHash;
 
     for (size_t i = 0; i < members.size(); i++) {
@@ -924,7 +925,7 @@ void CDKGSession::SendCommitment(CDKGPendingMessages& pendingMessages)
     std::vector<uint16_t> memberIndexes;
     std::vector<BLSVerificationVectorPtr> vvecs;
     BLSSecretKeyVector skContributions;
-    if (!dkgManager.GetVerifiedContributions(params.type, pindexQuorum, qc.validMembers, memberIndexes, vvecs, skContributions)) {
+    if (!dkgManager.GetVerifiedContributions(params.type, quorumHash, qc.validMembers, memberIndexes, vvecs, skContributions)) {
         logger.Batch("failed to get valid contributions");
         return;
     }
@@ -1011,7 +1012,7 @@ bool CDKGSession::PreVerifyMessage(const uint256& hash, const CDKGPrematureCommi
 
     retBan = false;
 
-    if (qc.quorumHash != pindexQuorum->GetBlockHash()) {
+    if (qc.quorumHash != quorumHash) {
         logger.Batch("commitment for wrong quorum, rejecting");
         return false;
     }
@@ -1090,7 +1091,7 @@ void CDKGSession::ReceiveMessage(const uint256& hash, const CDKGPrematureCommitm
     std::vector<BLSVerificationVectorPtr> vvecs;
     BLSSecretKeyVector skContributions;
     BLSVerificationVectorPtr quorumVvec;
-    if (dkgManager.GetVerifiedContributions(params.type, pindexQuorum, qc.validMembers, memberIndexes, vvecs, skContributions)) {
+    if (dkgManager.GetVerifiedContributions(params.type, qc.quorumHash, qc.validMembers, memberIndexes, vvecs, skContributions)) {
         quorumVvec = cache.BuildQuorumVerificationVector(::SerializeHash(memberIndexes), vvecs);
     }
 
@@ -1285,4 +1286,4 @@ void CDKGSession::RelayInvToParticipants(const CInv& inv) const
     });
 }
 
-} // namespace llmq
+}

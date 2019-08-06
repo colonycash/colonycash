@@ -6,10 +6,10 @@
 """
     ZMQ example using python3's asyncio
 
-    Dash should be started with the command line arguments:
-        dashd-testnet -daemon \
+    ColonyCash should be started with the command line arguments:
+        colonycashd-testnet -daemon \
+                -zmqpubhashblock=tcp://127.0.0.1:28332 \
                 -zmqpubrawtx=tcp://127.0.0.1:28332 \
-                -zmqpubrawblock=tcp://127.0.0.1:28332 \
                 -zmqpubhashtx=tcp://127.0.0.1:28332 \
                 -zmqpubhashblock=tcp://127.0.0.1:28332
 
@@ -38,7 +38,7 @@ port = 28332
 
 class ZMQHandler():
     def __init__(self):
-        self.loop = asyncio.get_event_loop()
+        self.loop = zmq.asyncio.install()
         self.zmqContext = zmq.asyncio.Context()
 
         self.zmqSubSocket = self.zmqContext.socket(zmq.SUB)
@@ -51,10 +51,8 @@ class ZMQHandler():
         self.zmqSubSocket.setsockopt_string(zmq.SUBSCRIBE, "hashinstantsenddoublespend")
         self.zmqSubSocket.setsockopt_string(zmq.SUBSCRIBE, "rawblock")
         self.zmqSubSocket.setsockopt_string(zmq.SUBSCRIBE, "rawchainlock")
-        self.zmqSubSocket.setsockopt_string(zmq.SUBSCRIBE, "rawchainlocksig")
         self.zmqSubSocket.setsockopt_string(zmq.SUBSCRIBE, "rawtx")
         self.zmqSubSocket.setsockopt_string(zmq.SUBSCRIBE, "rawtxlock")
-        self.zmqSubSocket.setsockopt_string(zmq.SUBSCRIBE, "rawtxlocksig")
         self.zmqSubSocket.setsockopt_string(zmq.SUBSCRIBE, "rawgovernancevote")
         self.zmqSubSocket.setsockopt_string(zmq.SUBSCRIBE, "rawgovernanceobject")
         self.zmqSubSocket.setsockopt_string(zmq.SUBSCRIBE, "rawinstantsenddoublespend")
@@ -97,17 +95,11 @@ class ZMQHandler():
         elif topic == b"rawchainlock":
             print('- RAW CHAINLOCK ('+sequence+') -')
             print(binascii.hexlify(body[:80]).decode("utf-8"))
-        elif topic == b"rawchainlocksig":
-            print('- RAW CHAINLOCK SIG ('+sequence+') -')
-            print(binascii.hexlify(body[:80]).decode("utf-8"))
         elif topic == b"rawtx":
             print('- RAW TX ('+sequence+') -')
             print(binascii.hexlify(body).decode("utf-8"))
         elif topic == b"rawtxlock":
             print('- RAW TX LOCK ('+sequence+') -')
-            print(binascii.hexlify(body).decode("utf-8"))
-        elif topic == b"rawtxlocksig":
-            print('- RAW TX LOCK SIG ('+sequence+') -')
             print(binascii.hexlify(body).decode("utf-8"))
         elif topic == b"rawgovernancevote":
             print('- RAW GOVERNANCE VOTE ('+sequence+') -')

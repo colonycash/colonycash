@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019 The Dash Core developers
+// Copyright (c) 2018 The Dash Core developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -9,6 +9,8 @@
 #include "validation.h"
 
 #include "evo/specialtx.h"
+
+#include <univalue.h>
 
 namespace llmq
 {
@@ -79,7 +81,7 @@ bool CFinalCommitment::Verify(const std::vector<CDeterministicMNCPtr>& members, 
 
     // sigs are only checked when the block is processed
     if (checkSigs) {
-        uint256 commitmentHash = CLLMQUtils::BuildCommitmentHash(params.type, quorumHash, validMembers, quorumPublicKey, quorumVvecHash);
+        uint256 commitmentHash = CLLMQUtils::BuildCommitmentHash((uint8_t)params.type, quorumHash, validMembers, quorumPublicKey, quorumVvecHash);
 
         std::vector<CBLSPublicKey> memberPubKeys;
         for (size_t i = 0; i < members.size(); i++) {
@@ -131,6 +133,28 @@ bool CFinalCommitment::VerifySizes(const Consensus::LLMQParams& params) const
     return true;
 }
 
+void CFinalCommitment::ToJson(UniValue& obj) const
+{
+    obj.setObject();
+    obj.push_back(Pair("version", (int)nVersion));
+    obj.push_back(Pair("llmqType", (int)llmqType));
+    obj.push_back(Pair("quorumHash", quorumHash.ToString()));
+    obj.push_back(Pair("signersCount", CountSigners()));
+    obj.push_back(Pair("validMembersCount", CountValidMembers()));
+    obj.push_back(Pair("quorumPublicKey", quorumPublicKey.ToString()));
+}
+
+void CFinalCommitmentTxPayload::ToJson(UniValue& obj) const
+{
+    obj.setObject();
+    obj.push_back(Pair("version", (int)nVersion));
+    obj.push_back(Pair("height", (int)nHeight));
+
+    UniValue qcObj;
+    commitment.ToJson(qcObj);
+    obj.push_back(Pair("commitment", qcObj));
+}
+
 bool CheckLLMQCommitment(const CTransaction& tx, const CBlockIndex* pindexPrev, CValidationState& state)
 {
     CFinalCommitmentTxPayload qcTx;
@@ -169,7 +193,7 @@ bool CheckLLMQCommitment(const CTransaction& tx, const CBlockIndex* pindexPrev, 
         return true;
     }
 
-    auto members = CLLMQUtils::GetAllQuorumMembers(params.type, pindexQuorum);
+    auto members = CLLMQUtils::GetAllQuorumMembers(params.type, qcTx.commitment.quorumHash);
     if (!qcTx.commitment.Verify(members, false)) {
         return state.DoS(100, false, REJECT_INVALID, "bad-qc-invalid");
     }
@@ -177,4 +201,4 @@ bool CheckLLMQCommitment(const CTransaction& tx, const CBlockIndex* pindexPrev, 
     return true;
 }
 
-} // namespace llmq
+}

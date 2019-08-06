@@ -4,9 +4,9 @@
 
 #include "mnauth.h"
 
-#include "masternode/activemasternode.h"
+#include "activemasternode.h"
 #include "evo/deterministicmns.h"
-#include "masternode/masternode-sync.h"
+#include "masternode-sync.h"
 #include "net.h"
 #include "net_processing.h"
 #include "netmessagemaker.h"
@@ -39,7 +39,7 @@ void CMNAuth::PushMNAUTH(CNode* pnode, CConnman& connman)
     mnauth.proRegTxHash = activeMasternodeInfo.proTxHash;
     mnauth.sig = activeMasternodeInfo.blsKeyOperator->Sign(signHash);
 
-    LogPrint(BCLog::NET, "CMNAuth::%s -- Sending MNAUTH, peer=%d\n", __func__, pnode->GetId());
+    LogPrint("net", "CMNAuth::%s -- Sending MNAUTH, peer=%d\n", __func__, pnode->id);
 
     connman.PushMessage(pnode, CNetMsgMaker(pnode->GetSendVersion()).Make(NetMsgType::MNAUTH, mnauth));
 }
@@ -60,14 +60,14 @@ void CMNAuth::ProcessMessage(CNode* pnode, const std::string& strCommand, CDataS
             // only one MNAUTH allowed
             if (!pnode->verifiedProRegTxHash.IsNull()) {
                 LOCK(cs_main);
-                Misbehaving(pnode->GetId(), 100);
+                Misbehaving(pnode->id, 100);
                 return;
             }
         }
 
         if (mnauth.proRegTxHash.IsNull() || !mnauth.sig.IsValid()) {
             LOCK(cs_main);
-            Misbehaving(pnode->GetId(), 100);
+            Misbehaving(pnode->id, 100);
             return;
         }
 
@@ -78,7 +78,7 @@ void CMNAuth::ProcessMessage(CNode* pnode, const std::string& strCommand, CDataS
             // in case he was unlucky and not up to date, just let him be connected as a regular node, which gives him
             // a chance to get up-to-date and thus realize by himself that he's not a MN anymore. We still give him a
             // low DoS score.
-            Misbehaving(pnode->GetId(), 10);
+            Misbehaving(pnode->id, 10);
             return;
         }
 
@@ -93,14 +93,14 @@ void CMNAuth::ProcessMessage(CNode* pnode, const std::string& strCommand, CDataS
             LOCK(cs_main);
             // Same as above, MN seems to not know about his fate yet, so give him a chance to update. If this is a
             // malicious actor (DoSing us), we'll ban him soon.
-            Misbehaving(pnode->GetId(), 10);
+            Misbehaving(pnode->id, 10);
             return;
         }
 
         connman.ForEachNode([&](CNode* pnode2) {
             if (pnode2->verifiedProRegTxHash == mnauth.proRegTxHash) {
-                LogPrint(BCLog::NET, "CMNAuth::ProcessMessage -- Masternode %s has already verified as peer %d, dropping old connection. peer=%d\n",
-                        mnauth.proRegTxHash.ToString(), pnode2->GetId(), pnode->GetId());
+                LogPrint("net", "CMNAuth::ProcessMessage -- Masternode %s has already verified as peer %d, dropping old connection. peer=%d\n",
+                        mnauth.proRegTxHash.ToString(), pnode2->id, pnode->id);
                 pnode2->fDisconnect = true;
             }
         });
@@ -111,7 +111,7 @@ void CMNAuth::ProcessMessage(CNode* pnode, const std::string& strCommand, CDataS
             pnode->verifiedPubKeyHash = dmn->pdmnState->pubKeyOperator.GetHash();
         }
 
-        LogPrint(BCLog::NET, "CMNAuth::%s -- Valid MNAUTH for %s, peer=%d\n", __func__, mnauth.proRegTxHash.ToString(), pnode->GetId());
+        LogPrint("net", "CMNAuth::%s -- Valid MNAUTH for %s, peer=%d\n", __func__, mnauth.proRegTxHash.ToString(), pnode->id);
     }
 }
 
@@ -127,25 +127,21 @@ void CMNAuth::NotifyMasternodeListChanged(bool undo, const CDeterministicMNList&
         if (pnode->verifiedProRegTxHash.IsNull()) {
             return;
         }
-        auto verifiedDmn = oldMNList.GetMN(pnode->verifiedProRegTxHash);
-        if (!verifiedDmn) {
-            return;
-        }
         bool doRemove = false;
-        if (diff.removedMns.count(verifiedDmn->internalId)) {
+        if (diff.removedMns.count(pnode->verifiedProRegTxHash)) {
             doRemove = true;
         } else {
-            auto it = diff.updatedMNs.find(verifiedDmn->internalId);
+            auto it = diff.updatedMNs.find(pnode->verifiedProRegTxHash);
             if (it != diff.updatedMNs.end()) {
-                if ((it->second.fields & CDeterministicMNStateDiff::Field_pubKeyOperator) && it->second.state.pubKeyOperator.GetHash() != pnode->verifiedPubKeyHash) {
+                if (it->second->pubKeyOperator.GetHash() != pnode->verifiedPubKeyHash) {
                     doRemove = true;
                 }
             }
         }
 
         if (doRemove) {
-            LogPrint(BCLog::NET, "CMNAuth::NotifyMasternodeListChanged -- Disconnecting MN %s due to key changed/removed, peer=%d\n",
-                     pnode->verifiedProRegTxHash.ToString(), pnode->GetId());
+            LogPrint("net", "CMNAuth::NotifyMasternodeListChanged -- Disconnecting MN %s due to key changed/removed, peer=%d\n",
+                     pnode->verifiedProRegTxHash.ToString(), pnode->id);
             pnode->fDisconnect = true;
         }
     });

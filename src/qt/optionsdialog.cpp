@@ -3,7 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #if defined(HAVE_CONFIG_H)
-#include "config/dash-config.h"
+#include "config/colonycash-config.h"
 #endif
 
 #include "optionsdialog.h"
@@ -20,8 +20,10 @@
 #ifdef ENABLE_WALLET
 #include "wallet/wallet.h" // for CWallet::GetRequiredFee()
 
-#include "privatesend/privatesend-client.h"
+#include "privatesend-client.h"
 #endif // ENABLE_WALLET
+
+#include <boost/thread.hpp>
 
 #include <QDataWidgetMapper>
 #include <QDir>
@@ -31,9 +33,8 @@
 #include <QTimer>
 
 #ifdef ENABLE_WALLET
-typedef CWallet* CWalletRef;
-extern std::vector<CWalletRef> vpwallets;
-#endif //ENABLE_WALLET
+extern CWallet* pwalletMain;
+#endif // ENABLE_WALLET
 
 OptionsDialog::OptionsDialog(QWidget *parent, bool enableWallet) :
     QDialog(parent),
@@ -107,7 +108,7 @@ OptionsDialog::OptionsDialog(QWidget *parent, bool enableWallet) :
 
     ui->lang->setToolTip(ui->lang->toolTip().arg(tr(PACKAGE_NAME)));
     ui->lang->addItem(QString("(") + tr("default") + QString(")"), QVariant(""));
-    for (const QString &langStr : translations.entryList())
+    Q_FOREACH(const QString &langStr, translations.entryList())
     {
         QLocale locale(langStr);
 
@@ -273,8 +274,8 @@ void OptionsDialog::on_okButton_clicked()
     mapper->submit();
 #ifdef ENABLE_WALLET
     privateSendClient.nCachedNumBlocks = std::numeric_limits<int>::max();
-    if(!vpwallets.empty())
-        vpwallets[0]->MarkDirty();
+    if(pwalletMain)
+        pwalletMain->MarkDirty();
 #endif // ENABLE_WALLET
     accept();
     updateDefaultProxyNets();

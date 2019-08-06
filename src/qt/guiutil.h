@@ -6,7 +6,6 @@
 #define BITCOIN_QT_GUIUTIL_H
 
 #include "amount.h"
-#include "fs.h"
 
 #include <QEvent>
 #include <QHeaderView>
@@ -16,6 +15,8 @@
 #include <QString>
 #include <QTableView>
 #include <QLabel>
+
+#include <boost/filesystem.hpp>
 
 class QValidatedLineEdit;
 class SendCoinsRecipient;
@@ -29,7 +30,7 @@ class QUrl;
 class QWidget;
 QT_END_NAMESPACE
 
-/** Utility functions used by the Dash Qt UI.
+/** Utility functions used by the ColonyCash Qt UI.
  */
 namespace GUIUtil
 {
@@ -44,7 +45,7 @@ namespace GUIUtil
     void setupAddressWidget(QValidatedLineEdit *widget, QWidget *parent);
     void setupAmountWidget(QLineEdit *widget, QWidget *parent);
 
-    // Parse "dash:" URI into recipient object, return true on successful parsing
+    // Parse "colonycash:" URI into recipient object, return true on successful parsing
     bool parseBitcoinURI(const QUrl &uri, SendCoinsRecipient *out);
     bool parseBitcoinURI(QString uri, SendCoinsRecipient *out);
     QString formatBitcoinURI(const SendCoinsRecipient &info);
@@ -113,7 +114,7 @@ namespace GUIUtil
     // Open debug.log
     void openDebugLogfile();
 	
-    // Open dash.conf
+    // Open colonycash.conf
     void openConfigfile();	
 
     // Browse backup folder
@@ -197,10 +198,10 @@ namespace GUIUtil
     QString getThemeName();
     
     /* Convert QString to OS specific boost path through UTF-8 */
-    fs::path qstringToBoostPath(const QString &path);
+    boost::filesystem::path qstringToBoostPath(const QString &path);
 
     /* Convert OS specific boost path to QString through UTF-8 */
-    QString boostPathToQString(const fs::path &path);
+    QString boostPathToQString(const boost::filesystem::path &path);
 
     /* Convert seconds into a QString with days, hours, mins, secs */
     QString formatDurationStr(int secs);

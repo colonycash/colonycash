@@ -6,7 +6,6 @@
 #define BITCOIN_DBWRAPPER_H
 
 #include "clientversion.h"
-#include "fs.h"
 #include "serialize.h"
 #include "streams.h"
 #include "util.h"
@@ -14,6 +13,8 @@
 #include "version.h"
 
 #include <typeindex>
+
+#include <boost/filesystem/path.hpp>
 
 #include <leveldb/db.h>
 #include <leveldb/write_batch.h>
@@ -239,7 +240,7 @@ public:
      * @param[in] obfuscate   If true, store data obfuscated via simple XOR. If false, XOR
      *                        with a zero'd byte array.
      */
-    CDBWrapper(const fs::path& path, size_t nCacheSize, bool fMemory = false, bool fWipe = false, bool obfuscate = false);
+    CDBWrapper(const boost::filesystem::path& path, size_t nCacheSize, bool fMemory = false, bool fWipe = false, bool obfuscate = false);
     ~CDBWrapper();
 
     template <typename K>
@@ -388,11 +389,6 @@ public:
         leveldb::Slice slKey1(ssKey1.data(), ssKey1.size());
         leveldb::Slice slKey2(ssKey2.data(), ssKey2.size());
         pdb->CompactRange(&slKey1, &slKey2);
-    }
-
-    void CompactFull() const
-    {
-        pdb->CompactRange(nullptr, nullptr);
     }
 
 };

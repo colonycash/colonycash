@@ -1,17 +1,15 @@
-// Copyright (c) 2018-2019 The Dash Core developers
+// Copyright (c) 2018 The Dash Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef DASH_EVODB_H
-#define DASH_EVODB_H
+#ifndef CCASH_EVODB_H
+#define CCASH_EVODB_H
 
 #include "dbwrapper.h"
 #include "sync.h"
 #include "uint256.h"
 
-// "b_b" was used in the initial version of deterministic MN storage
-// "b_b2" was used after compact diffs were introduced
-static const std::string EVODB_BEST_BLOCK = "b_b2";
+static const std::string EVODB_BEST_BLOCK = "b_b";
 
 class CEvoDB
 {
@@ -88,4 +86,4 @@ public:
 
 extern CEvoDB* evoDb;
 
-#endif //DASH_EVODB_H
+#endif //CCASH_EVODB_H

@@ -6,7 +6,7 @@
 #define BITCOIN_QT_BITCOINGUI_H
 
 #if defined(HAVE_CONFIG_H)
-#include "config/dash-config.h"
+#include "config/colonycash-config.h"
 #endif
 
 #include "amount.h"
@@ -18,10 +18,6 @@
 #include <QPoint>
 #include <QPushButton>
 #include <QSystemTrayIcon>
-
-#ifdef Q_OS_MAC
-#include <qt/macos_appnap.h>
-#endif
 
 class ClientModel;
 class NetworkStyle;
@@ -35,6 +31,8 @@ class WalletFrame;
 class WalletModel;
 class HelpMessageDialog;
 class ModalOverlay;
+
+class CWallet;
 
 QT_BEGIN_NAMESPACE
 class QAction;
@@ -134,10 +132,6 @@ private:
     RPCConsole *rpcConsole;
     HelpMessageDialog *helpMessageDialog;
     ModalOverlay *modalOverlay;
-
-#ifdef Q_OS_MAC
-    CAppNapInhibitor* m_app_nap_inhibitor = nullptr;
-#endif
 
     /** Keep track of previous number of blocks, to detect progress */
     int prevBlocks;
@@ -250,7 +244,7 @@ private Q_SLOTS:
     void showPeers();
     void showRepair();
 
-    /** Open external (default) editor with dash.conf */
+    /** Open external (default) editor with colonycash.conf */
     void showConfEditor();
     /** Show folder with wallet backups in default file browser */
     void showBackups();

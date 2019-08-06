@@ -4,9 +4,10 @@
 
 #include "dbwrapper.h"
 
-#include "fs.h"
 #include "util.h"
 #include "random.h"
+
+#include <boost/filesystem.hpp>
 
 #include <leveldb/cache.h>
 #include <leveldb/env.h>
@@ -20,9 +21,8 @@ public:
     // This code is adapted from posix_logger.h, which is why it is using vsprintf.
     // Please do not do this in normal code
     virtual void Logv(const char * format, va_list ap) override {
-            if (!LogAcceptCategory(BCLog::LEVELDB)) {
+            if (!LogAcceptCategory("leveldb"))
                 return;
-            }
             char buffer[500];
             for (int iter = 0; iter < 2; iter++) {
                 char* base;
@@ -90,7 +90,7 @@ static leveldb::Options GetOptions(size_t nCacheSize)
     return options;
 }
 
-CDBWrapper::CDBWrapper(const fs::path& path, size_t nCacheSize, bool fMemory, bool fWipe, bool obfuscate)
+CDBWrapper::CDBWrapper(const boost::filesystem::path& path, size_t nCacheSize, bool fMemory, bool fWipe, bool obfuscate)
 {
     penv = NULL;
     readoptions.verify_checksums = true;
@@ -108,14 +108,14 @@ CDBWrapper::CDBWrapper(const fs::path& path, size_t nCacheSize, bool fMemory, bo
             leveldb::Status result = leveldb::DestroyDB(path.string(), options);
             dbwrapper_private::HandleError(result);
         }
-        TryCreateDirectories(path);
+        TryCreateDirectory(path);
         LogPrintf("Opening LevelDB in %s\n", path.string());
     }
     leveldb::Status status = leveldb::DB::Open(options, path.string(), &pdb);
     dbwrapper_private::HandleError(status);
     LogPrintf("Opened LevelDB successfully\n");
 
-    if (gArgs.GetBoolArg("-forcecompactdb", false)) {
+    if (GetBoolArg("-forcecompactdb", false)) {
         LogPrintf("Starting database compaction of %s\n", path.string());
         pdb->CompactRange(nullptr, nullptr);
         LogPrintf("Finished database compaction of %s\n", path.string());
@@ -215,4 +215,4 @@ const std::vector<unsigned char>& GetObfuscateKey(const CDBWrapper &w)
     return w.obfuscate_key;
 }
 
-} // namespace dbwrapper_private
+};

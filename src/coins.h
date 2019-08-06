@@ -6,7 +6,6 @@
 #ifndef BITCOIN_COINS_H
 #define BITCOIN_COINS_H
 
-#include "primitives/transaction.h"
 #include "compressor.h"
 #include "core_memusage.h"
 #include "hash.h"
@@ -16,7 +15,6 @@
 
 #include <assert.h>
 #include <stdint.h>
-
 #include <unordered_map>
 
 /**
@@ -130,6 +128,7 @@ public:
 
     virtual bool GetKey(COutPoint &key) const = 0;
     virtual bool GetValue(Coin &coin) const = 0;
+    /* Don't care about GetKeySize here */
     virtual unsigned int GetValueSize() const = 0;
 
     virtual bool Valid() const = 0;
@@ -269,7 +268,7 @@ public:
     size_t DynamicMemoryUsage() const;
 
     /** 
-     * Amount of dash coming in to a transaction
+     * Amount of colonycash coming in to a transaction
      * Note that lightweight clients may not know anything besides the hash of previous transactions,
      * so may not be able to calculate this.
      *

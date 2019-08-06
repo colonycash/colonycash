@@ -12,6 +12,7 @@
 #include "script/standard.h"
 #include "uint256.h"
 
+#include <boost/foreach.hpp>
 
 typedef std::vector<unsigned char> valtype;
 
@@ -147,7 +148,7 @@ bool SignSignature(const CKeyStore &keystore, const CTransaction& txFrom, CMutab
 static CScript PushAll(const std::vector<valtype>& values)
 {
     CScript result;
-    for (const valtype& v : values)
+    BOOST_FOREACH(const valtype& v, values)
         result << v;
     return result;
 }
@@ -158,12 +159,12 @@ static CScript CombineMultisig(const CScript& scriptPubKey, const BaseSignatureC
 {
     // Combine all the signatures we've got:
     std::set<valtype> allsigs;
-    for (const valtype& v : sigs1)
+    BOOST_FOREACH(const valtype& v, sigs1)
     {
         if (!v.empty())
             allsigs.insert(v);
     }
-    for (const valtype& v : sigs2)
+    BOOST_FOREACH(const valtype& v, sigs2)
     {
         if (!v.empty())
             allsigs.insert(v);
@@ -174,7 +175,7 @@ static CScript CombineMultisig(const CScript& scriptPubKey, const BaseSignatureC
     unsigned int nSigsRequired = vSolutions.front()[0];
     unsigned int nPubKeys = vSolutions.size()-2;
     std::map<valtype, valtype> sigs;
-    for (const valtype& sig : allsigs)
+    BOOST_FOREACH(const valtype& sig, allsigs)
     {
         for (unsigned int i = 0; i < nPubKeys; i++)
         {
@@ -287,7 +288,7 @@ public:
     }
 };
 const DummySignatureChecker dummyChecker;
-} // namespace
+}
 
 const BaseSignatureChecker& DummySignatureCreator::Checker() const
 {

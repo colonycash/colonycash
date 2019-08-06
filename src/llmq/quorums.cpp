@@ -12,10 +12,10 @@
 
 #include "evo/specialtx.h"
 
-#include "masternode/activemasternode.h"
+#include "activemasternode.h"
 #include "chainparams.h"
 #include "init.h"
-#include "masternode/masternode-sync.h"
+#include "masternode-sync.h"
 #include "univalue.h"
 #include "validation.h"
 
@@ -32,7 +32,7 @@ CQuorumManager* quorumManager;
 static uint256 MakeQuorumKey(const CQuorum& q)
 {
     CHashWriter hw(SER_NETWORK, 0);
-    hw << q.params.type;
+    hw << (uint8_t)q.params.type;
     hw << q.qc.quorumHash;
     for (const auto& dmn : q.members) {
         hw << dmn->proTxHash;
@@ -49,10 +49,10 @@ CQuorum::~CQuorum()
     }
 }
 
-void CQuorum::Init(const CFinalCommitment& _qc, const CBlockIndex* _pindexQuorum, const uint256& _minedBlockHash, const std::vector<CDeterministicMNCPtr>& _members)
+void CQuorum::Init(const CFinalCommitment& _qc, int _height, const uint256& _minedBlockHash, const std::vector<CDeterministicMNCPtr>& _members)
 {
     qc = _qc;
-    pindexQuorum = _pindexQuorum;
+    height = _height;
     members = _members;
     minedBlockHash = _minedBlockHash;
 }
@@ -138,18 +138,18 @@ void CQuorum::StartCachePopulatorThread(std::shared_ptr<CQuorum> _this)
     }
 
     cxxtimer::Timer t(true);
-    LogPrint(BCLog::LLMQ, "CQuorum::StartCachePopulatorThread -- start\n");
+    LogPrint("llmq", "CQuorum::StartCachePopulatorThread -- start\n");
 
     // this thread will exit after some time
     // when then later some other thread tries to get keys, it will be much faster
     _this->cachePopulatorThread = std::thread([_this, t]() {
-        RenameThread("dash-q-cachepop");
+        RenameThread("colonycash-q-cachepop");
         for (size_t i = 0; i < _this->members.size() && !_this->stopCachePopulatorThread && !ShutdownRequested(); i++) {
             if (_this->qc.validMembers[i]) {
                 _this->GetPubKeyShare(i);
             }
         }
-        LogPrint(BCLog::LLMQ, "CQuorum::StartCachePopulatorThread -- done. time=%d\n", t.count());
+        LogPrint("llmq", "CQuorum::StartCachePopulatorThread -- done. time=%d\n", t.count());
     });
 }
 
@@ -186,22 +186,22 @@ void CQuorumManager::EnsureQuorumConnections(Consensus::LLMQType llmqType, const
     connmanQuorumsToDelete.erase(curDkgBlock);
 
     for (auto& quorum : lastQuorums) {
-        if (!quorum->IsMember(myProTxHash) && !gArgs.GetBoolArg("-watchquorums", DEFAULT_WATCH_QUORUMS)) {
+        if (!quorum->IsMember(myProTxHash) && !GetBoolArg("-watchquorums", DEFAULT_WATCH_QUORUMS)) {
             continue;
         }
 
         if (!g_connman->HasMasternodeQuorumNodes(llmqType, quorum->qc.quorumHash)) {
             std::set<uint256> connections;
             if (quorum->IsMember(myProTxHash)) {
-                connections = CLLMQUtils::GetQuorumConnections(llmqType, quorum->pindexQuorum, myProTxHash);
+                connections = CLLMQUtils::GetQuorumConnections(llmqType, quorum->qc.quorumHash, myProTxHash);
             } else {
-                auto cindexes = CLLMQUtils::CalcDeterministicWatchConnections(llmqType, quorum->pindexQuorum, quorum->members.size(), 1);
+                auto cindexes = CLLMQUtils::CalcDeterministicWatchConnections(llmqType, quorum->qc.quorumHash, quorum->members.size(), 1);
                 for (auto idx : cindexes) {
                     connections.emplace(quorum->members[idx]->proTxHash);
                 }
             }
             if (!connections.empty()) {
-                if (LogAcceptCategory(BCLog::LLMQ)) {
+                if (LogAcceptCategory("llmq")) {
                     auto mnList = deterministicMNManager->GetListAtChainTip();
                     std::string debugMsg = strprintf("CQuorumManager::%s -- adding masternodes quorum connections for quorum %s:\n", __func__, quorum->qc.quorumHash.ToString());
                     for (auto& c : connections) {
@@ -212,7 +212,7 @@ void CQuorumManager::EnsureQuorumConnections(Consensus::LLMQType llmqType, const
                             debugMsg += strprintf("  %s (%s)\n", c.ToString(), dmn->pdmnState->addr.ToString(false));
                         }
                     }
-                    LogPrint(BCLog::LLMQ, debugMsg.c_str());
+                    LogPrint("llmq", debugMsg);
                 }
                 g_connman->AddMasternodeQuorumNodes(llmqType, quorum->qc.quorumHash, connections);
             }
@@ -221,7 +221,7 @@ void CQuorumManager::EnsureQuorumConnections(Consensus::LLMQType llmqType, const
     }
 
     for (auto& qh : connmanQuorumsToDelete) {
-        LogPrint(BCLog::LLMQ, "CQuorumManager::%s -- removing masternodes quorum connections for quorum %s:\n", __func__, qh.ToString());
+        LogPrint("llmq", "CQuorumManager::%s -- removing masternodes quorum connections for quorum %s:\n", __func__, qh.ToString());
         g_connman->RemoveMasternodeQuorumNodes(llmqType, qh);
     }
 }
@@ -231,9 +231,9 @@ bool CQuorumManager::BuildQuorumFromCommitment(const CFinalCommitment& qc, const
     assert(pindexQuorum);
     assert(qc.quorumHash == pindexQuorum->GetBlockHash());
 
-    auto members = CLLMQUtils::GetAllQuorumMembers((Consensus::LLMQType)qc.llmqType, pindexQuorum);
+    auto members = CLLMQUtils::GetAllQuorumMembers((Consensus::LLMQType)qc.llmqType, qc.quorumHash);
 
-    quorum->Init(qc, pindexQuorum, minedBlockHash, members);
+    quorum->Init(qc, pindexQuorum->nHeight, minedBlockHash, members);
 
     bool hasValidVvec = false;
     if (quorum->ReadContributions(evoDb)) {
@@ -243,7 +243,7 @@ bool CQuorumManager::BuildQuorumFromCommitment(const CFinalCommitment& qc, const
             quorum->WriteContributions(evoDb);
             hasValidVvec = true;
         } else {
-            LogPrint(BCLog::LLMQ, "CQuorumManager::%s -- quorum.ReadContributions and BuildQuorumContributions for block %s failed\n", __func__, qc.quorumHash.ToString());
+            LogPrint("llmq", "CQuorumManager::%s -- quorum.ReadContributions and BuildQuorumContributions for block %s failed\n", __func__, qc.quorumHash.ToString());
         }
     }
 
@@ -262,7 +262,7 @@ bool CQuorumManager::BuildQuorumContributions(const CFinalCommitment& fqc, std::
     std::vector<uint16_t> memberIndexes;
     std::vector<BLSVerificationVectorPtr> vvecs;
     BLSSecretKeyVector skContributions;
-    if (!dkgManager.GetVerifiedContributions((Consensus::LLMQType)fqc.llmqType, quorum->pindexQuorum, fqc.validMembers, memberIndexes, vvecs, skContributions)) {
+    if (!dkgManager.GetVerifiedContributions((Consensus::LLMQType)fqc.llmqType, fqc.quorumHash, fqc.validMembers, memberIndexes, vvecs, skContributions)) {
         return false;
     }
 
@@ -272,20 +272,20 @@ bool CQuorumManager::BuildQuorumContributions(const CFinalCommitment& fqc, std::
     cxxtimer::Timer t2(true);
     quorumVvec = blsWorker.BuildQuorumVerificationVector(vvecs);
     if (quorumVvec == nullptr) {
-        LogPrint(BCLog::LLMQ, "CQuorumManager::%s -- failed to build quorumVvec\n", __func__);
+        LogPrint("llmq", "CQuorumManager::%s -- failed to build quorumVvec\n", __func__);
         // without the quorum vvec, there can't be a skShare, so we fail here. Failure is not fatal here, as it still
         // allows to use the quorum as a non-member (verification through the quorum pub key)
         return false;
     }
     skShare = blsWorker.AggregateSecretKeys(skContributions);
     if (!skShare.IsValid()) {
-        LogPrint(BCLog::LLMQ, "CQuorumManager::%s -- failed to build skShare\n", __func__);
+        LogPrint("llmq", "CQuorumManager::%s -- failed to build skShare\n", __func__);
         // We don't bail out here as this is not a fatal error and still allows us to recover public key shares (as we
         // have a valid quorum vvec at this point)
     }
     t2.stop();
 
-    LogPrint(BCLog::LLMQ, "CQuorumManager::%s -- built quorum vvec and skShare. time=%d\n", __func__, t2.count());
+    LogPrint("llmq", "CQuorumManager::%s -- built quorum vvec and skShare. time=%d\n", __func__, t2.count());
 
     quorum->quorumVvec = quorumVvec;
     quorum->skShare = skShare;
@@ -364,7 +364,7 @@ CQuorumCPtr CQuorumManager::GetQuorum(Consensus::LLMQType llmqType, const uint25
         auto quorumIt = mapBlockIndex.find(quorumHash);
 
         if (quorumIt == mapBlockIndex.end()) {
-            LogPrint(BCLog::LLMQ, "CQuorumManager::%s -- block %s not found", __func__, quorumHash.ToString());
+            LogPrint("llmq", "CQuorumManager::%s -- block %s not found", __func__, quorumHash.ToString());
             return nullptr;
         }
         pindexQuorum = quorumIt->second;
@@ -419,4 +419,4 @@ CQuorumCPtr CQuorumManager::GetNewestQuorum(Consensus::LLMQType llmqType)
     return quorums.front();
 }
 
-} // namespace llmq
+}

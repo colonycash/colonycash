@@ -35,9 +35,9 @@ struct BIP9Deployment {
     /** Timeout/expiry MedianTime for the deployment attempt. */
     int64_t nTimeout;
     /** The number of past blocks (including the block under consideration) to be taken into account for locking in a fork. */
-    int64_t nWindowSize{0};
+    int64_t nWindowSize;
     /** A number of blocks, in the range of 1..nWindowSize, which must signal for a fork in order to lock it in. */
-    int64_t nThreshold{0};
+    int64_t nThreshold;
 };
 
 enum LLMQType : uint8_t
@@ -53,7 +53,7 @@ enum LLMQType : uint8_t
 };
 
 // Configures a LLMQ and its DKG
-// See https://github.com/dashpay/dips/blob/master/dip-0006.md for more details
+// See https://github.com/colonycashpay/dips/blob/master/dip-0006.md for more details
 struct LLMQParams {
     LLMQType type;
 
@@ -125,6 +125,8 @@ struct Params {
     int nMasternodePaymentsIncreasePeriod; // in blocks
     int nInstantSendConfirmationsRequired; // in blocks
     int nInstantSendKeepLock; // in blocks
+    int nInstantSendSigsRequired;
+    int nInstantSendSigsTotal;
     int nBudgetPaymentsStartBlock;
     int nBudgetPaymentsCycleBlocks;
     int nBudgetPaymentsWindowBlocks;
@@ -180,10 +182,5 @@ struct Params {
     LLMQType llmqForInstantSend{LLMQ_NONE};
 };
 } // namespace Consensus
-
-// This must be outside of all namespaces. We must also duplicate the forward declaration of is_serializable_enum to
-// avoid inclusion of serialize.h here.
-template<typename T> struct is_serializable_enum;
-template<> struct is_serializable_enum<Consensus::LLMQType> : std::true_type {};
 
 #endif // BITCOIN_CONSENSUS_PARAMS_H

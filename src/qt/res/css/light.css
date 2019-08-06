@@ -760,7 +760,7 @@ QDialog#HelpMessageDialog QScrollBar:vertical, QDialog#HelpMessageDialog QScroll
 border:0;
 }
 
-/* About Dash Dialog */
+/* About ColonyCash Dialog */
 QDialog#AboutDialog {
 background-color:#F8F6F6;
 }
@@ -769,7 +769,7 @@ QDialog#AboutDialog QLabel#label, QDialog#AboutDialog QLabel#copyrightLabel, QDi
 margin-left:10px;
 }
 
-QDialog#AboutDialog QLabel#label_2 { /* Margin for About Dash text */
+QDialog#AboutDialog QLabel#label_2 { /* Margin for About ColonyCash text */
 margin-right:10px;
 }
 
@@ -1125,16 +1125,16 @@ QWidget .QFrame#frame_2 { /* Transactions Widget */
 min-width:410px;
 margin-right:20px;
 margin-left:0;
-margin-top:15px;
-background-image: url(':/images/light/dash_logo_horizontal');
-background-repeat:none;
+margin-top:0;
+background-image: url(':/images/light/colonycash_logo_horizontal');
+
 }
 
 QWidget .QFrame#frame_2 .QLabel#label_4 { /* Recent Transactions Label */
 min-width:180px;
 color:#999;
 margin-left:67px;
-margin-top:83px;
+
 margin-right:5px;
 padding-right:5px;
 font-weight:normal;
@@ -1145,7 +1145,7 @@ min-height:24px;
 QWidget .QFrame#frame_2 .QLabel#labelTransactionsStatus { /* Recent Transactions Sync Status */
 qproperty-alignment: 'AlignBottom | AlignRight';
 min-width:93px;
-margin-top:83px;
+
 margin-left:16px;
 margin-right:5px;
 min-height:16px;
@@ -1279,6 +1279,16 @@ background: qradialgradient(cx:0.5, cy:0.5, radius: 0.5, fx:0.5, fy:0.5, stop:0 
 border-radius:5px;
 padding-top:20px;
 padding-bottom:18px;
+}
+
+QDialog#SendCoinsDialog .QCheckBox#checkUseInstantSend { /* InstantSend Checkbox */
+color:#616161;
+font-weight:bold;
+background: qradialgradient(cx:0.5, cy:0.5, radius: 0.5, fx:0.5, fy:0.5, stop:0 rgba(248, 246, 246, 128), stop: 1 rgba(0, 0, 0, 0));
+border-radius:5px;
+padding-top:20px;
+padding-bottom:18px;
+margin-left:10px;
 margin-right:20px;
 }
 

@@ -11,9 +11,10 @@
 #include "script/sign.h"
 #include "script/ismine.h"
 #include "uint256.h"
-#include "test/test_dash.h"
+#include "test/test_colonycash.h"
 
 
+#include <boost/foreach.hpp>
 #include <boost/test/unit_test.hpp>
 
 typedef std::vector<unsigned char> valtype;
@@ -27,7 +28,7 @@ sign_multisig(CScript scriptPubKey, std::vector<CKey> keys, CTransaction transac
 
     CScript result;
     result << OP_0; // CHECKMULTISIG bug workaround
-    for (const CKey &key : keys)
+    BOOST_FOREACH(const CKey &key, keys)
     {
         std::vector<unsigned char> vchSig;
         BOOST_CHECK(key.Sign(hash, vchSig));

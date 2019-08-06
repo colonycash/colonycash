@@ -12,6 +12,7 @@
 
 #include <string>
 #include <vector>
+#include <boost/foreach.hpp>
 
 int CCrypter::BytesToKeySHA512AES(const std::vector<unsigned char>& chSalt, const SecureString& strKeyData, int count, unsigned char *key,unsigned char *iv) const
 {
@@ -336,6 +337,7 @@ bool CCryptoKeyStore::GetPubKey(const CKeyID &address, CPubKey& vchPubKeyOut) co
         // Check for watch-only pubkeys
         return CBasicKeyStore::GetPubKey(address, vchPubKeyOut);
     }
+    return false;
 }
 
 bool CCryptoKeyStore::EncryptKeys(CKeyingMaterial& vMasterKeyIn)
@@ -346,7 +348,7 @@ bool CCryptoKeyStore::EncryptKeys(CKeyingMaterial& vMasterKeyIn)
             return false;
 
         fUseCrypto = true;
-        for (KeyMap::value_type& mKey : mapKeys)
+        BOOST_FOREACH(KeyMap::value_type& mKey, mapKeys)
         {
             const CKey &key = mKey.second;
             CPubKey vchPubKey = key.GetPubKey();

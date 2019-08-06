@@ -346,7 +346,7 @@ public:
     {
         // Special case: stream << stream concatenates like stream += stream
         if (!vch.empty())
-            s.write((char*)vch.data(), vch.size() * sizeof(value_type));
+            s.write((char*)&vch[0], vch.size() * sizeof(vch[0]));
     }
 
     template<typename T>
@@ -365,8 +365,8 @@ public:
         return (*this);
     }
 
-    void GetAndClear(CSerializeData &d) {
-        d.insert(d.end(), begin(), end());
+    void GetAndClear(CSerializeData &data) {
+        data.insert(data.end(), begin(), end());
         clear();
     }
 

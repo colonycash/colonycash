@@ -2,8 +2,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef DASH_QUORUMS_INSTANTSEND_H
-#define DASH_QUORUMS_INSTANTSEND_H
+#ifndef CCASH_QUORUMS_INSTANTSEND_H
+#define CCASH_QUORUMS_INSTANTSEND_H
 
 #include "quorums_signing.h"
 
@@ -62,7 +62,6 @@ public:
     std::unordered_map<uint256, CInstantSendLockPtr> RemoveConfirmedInstantSendLocks(int nUntilHeight);
     void RemoveArchivedInstantSendLocks(int nUntilHeight);
     bool HasArchivedInstantSendLock(const uint256& islockHash);
-    size_t GetInstantSendLockCount();
 
     CInstantSendLockPtr GetInstantSendLockByHash(const uint256& hash);
     uint256 GetInstantSendLockHashByTxid(const uint256& txid);
@@ -139,12 +138,9 @@ public:
     bool PreVerifyInstantSendLock(NodeId nodeId, const CInstantSendLock& islock, bool& retBan);
     bool ProcessPendingInstantSendLocks();
     void ProcessInstantSendLock(NodeId from, const uint256& hash, const CInstantSendLock& islock);
-    void UpdateWalletTransaction(const CTransactionRef& tx, const CInstantSendLock& islock);
+    void UpdateWalletTransaction(const uint256& txid, const CTransactionRef& tx);
 
-    void ProcessNewTransaction(const CTransactionRef& tx, const CBlockIndex* pindex);
-    void TransactionAddedToMempool(const CTransactionRef& tx);
-    void BlockConnected(const std::shared_ptr<const CBlock>& pblock, const CBlockIndex* pindex, const std::vector<CTransactionRef>& vtxConflicted);
-    void BlockDisconnected(const std::shared_ptr<const CBlock>& pblock, const CBlockIndex* pindexDisconnected);
+    void SyncTransaction(const CTransaction &tx, const CBlockIndex *pindex, int posInBlock);
     void AddNonLockedTx(const CTransactionRef& tx);
     void RemoveNonLockedTx(const uint256& txid, bool retryChildren);
     void RemoveConflictedTx(const CTransaction& tx);
@@ -163,15 +159,20 @@ public:
     bool AlreadyHave(const CInv& inv);
     bool GetInstantSendLockByHash(const uint256& hash, CInstantSendLock& ret);
 
-    size_t GetInstantSendLockCount();
-
     void WorkThreadMain();
 };
 
 extern CInstantSendManager* quorumInstantSendManager;
 
+// This involves 2 sporks: SPORK_2_INSTANTSEND_ENABLED and SPORK_20_INSTANTSEND_LLMQ_BASED
+// SPORK_2_INSTANTSEND_ENABLED generally enables/disables InstantSend and SPORK_20_INSTANTSEND_LLMQ_BASED switches
+// between the old and the new (LLMQ based) system
+// TODO When the new system is fully deployed and enabled, we can remove this special handling in a future version
+// and revert to only using SPORK_2_INSTANTSEND_ENABLED.
+bool IsOldInstantSendEnabled();
+bool IsNewInstantSendEnabled();
 bool IsInstantSendEnabled();
 
-} // namespace llmq
+}
 
-#endif//DASH_QUORUMS_INSTANTSEND_H
+#endif//CCASH_QUORUMS_INSTANTSEND_H

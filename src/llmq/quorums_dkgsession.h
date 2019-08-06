@@ -2,8 +2,8 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef DASH_QUORUMS_DKGSESSION_H
-#define DASH_QUORUMS_DKGSESSION_H
+#ifndef CCASH_QUORUMS_DKGSESSION_H
+#define CCASH_QUORUMS_DKGSESSION_H
 
 #include "consensus/params.h"
 #include "net.h"
@@ -36,7 +36,7 @@ public:
 class CDKGContribution
 {
 public:
-    Consensus::LLMQType llmqType;
+    uint8_t llmqType;
     uint256 quorumHash;
     uint256 proTxHash;
     BLSVerificationVectorPtr vvec;
@@ -88,7 +88,7 @@ public:
 class CDKGComplaint
 {
 public:
-    Consensus::LLMQType llmqType;
+    uint8_t llmqType;
     uint256 quorumHash;
     uint256 proTxHash;
     std::vector<bool> badMembers;
@@ -123,7 +123,7 @@ public:
 class CDKGJustification
 {
 public:
-    Consensus::LLMQType llmqType;
+    uint8_t llmqType;
     uint256 quorumHash;
     uint256 proTxHash;
     std::vector<std::pair<uint32_t, CBLSSecretKey>> contributions;
@@ -157,7 +157,7 @@ public:
 class CDKGPrematureCommitment
 {
 public:
-    Consensus::LLMQType llmqType;
+    uint8_t llmqType;
     uint256 quorumHash;
     uint256 proTxHash;
     std::vector<bool> validMembers;
@@ -249,7 +249,8 @@ private:
     CBLSWorkerCache cache;
     CDKGSessionManager& dkgManager;
 
-    const CBlockIndex* pindexQuorum;
+    uint256 quorumHash;
+    int height{-1};
 
 private:
     std::vector<std::unique_ptr<CDKGMember>> members;
@@ -286,7 +287,7 @@ public:
     CDKGSession(const Consensus::LLMQParams& _params, CBLSWorker& _blsWorker, CDKGSessionManager& _dkgManager) :
         params(_params), blsWorker(_blsWorker), cache(_blsWorker), dkgManager(_dkgManager) {}
 
-    bool Init(const CBlockIndex* pindexQuorum, const std::vector<CDeterministicMNCPtr>& mns, const uint256& _myProTxHash);
+    bool Init(int _height, const uint256& _quorumHash, const std::vector<CDeterministicMNCPtr>& mns, const uint256& _myProTxHash);
 
     size_t GetMyMemberIndex() const { return myIdx; }
 
@@ -342,6 +343,6 @@ public:
 
 void SetSimulatedDKGErrorRate(const std::string& type, double rate);
 
-} // namespace llmq
+}
 
-#endif //DASH_QUORUMS_DKGSESSION_H
+#endif //CCASH_QUORUMS_DKGSESSION_H
